@@ -2,6 +2,7 @@
 # tmx: pick a tmux session with fzf and attach/switch to it.
 # deps: tmux, fzf
 # license: MIT
+# author: stephen
 
 set -eu
 
