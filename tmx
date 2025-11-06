@@ -26,9 +26,18 @@ menu() {
 SEL="$(
   menu | fzf --height=50% --layout=reverse --border \
              --prompt='tmux> ' --info=inline --ansi \
-             --expect=enter,ctrl-d || true
+             --expect=enter,ctrl-d \
+             --preview '
+               if [ "{1}" = "[+ ] Create new session" ]; then
+                 printf "Create a new tmux session in: %s\n\n" "$PWD"
+                 printf "Press Enter to name it.\n"
+               else
+                 tmux list-windows -F "#{window_index}: #{window_name}#{?window_active,  [active],}  [#{window_panes} panes]" -t "{1}" 2>/dev/null \
+                 || echo "No windows or session not found."
+               fi
+             ' \
+             --preview-window=right,60%,border-left || true
 )"
-[ -z "${SEL}" ] && exit 0
 
 KEY="$(printf '%s' "${SEL}" | sed -n '1p')"
 CHOICE="$(printf '%s' "${SEL}" | sed -n '$p')"
