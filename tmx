@@ -1,8 +1,7 @@
 #!/usr/bin/env sh
-# tmx: pick a tmux session with fzf and attach/switch to it.
+# tmx: pick or create a tmux session via fzf, then attach/switch.
 # deps: tmux, fzf
 # license: MIT
-# author: stephen
 
 set -eu
 
@@ -15,20 +14,19 @@ need() {
 need tmux
 need fzf
 
-# List session names only; empty if none.
+# list sessions; show a virtual "create" row first
 SESSIONS="$(tmux list-sessions -F '#S' 2>/dev/null || true)"
-if [ -z "${SESSIONS}" ]; then
-  printf '%s\n' "No active tmux sessions."
-  printf '%s\n' "Create one with: tmux new -s mysession"
-  exit 1
-fi
 
-# Choose. Enter = normal attach/switch. Ctrl-D = steal (detach others).
+# Build menu. First line is the create option.
+menu() {
+  printf '%s\n' "[+ ] Create new session"
+  [ -n "${SESSIONS}" ] && printf '%s\n' "${SESSIONS}" || :
+}
+
 SEL="$(
-  printf '%s\n' "${SESSIONS}" \
-  | fzf --height=50% --layout=reverse --border \
-        --prompt='tmux> ' --info=inline --ansi \
-        --expect=enter,ctrl-d || true
+  menu | fzf --height=50% --layout=reverse --border \
+             --prompt='tmux> ' --info=inline --ansi \
+             --expect=enter,ctrl-d || true
 )"
 [ -z "${SEL}" ] && exit 0
 
@@ -36,30 +34,53 @@ KEY="$(printf '%s' "${SEL}" | sed -n '1p')"
 CHOICE="$(printf '%s' "${SEL}" | sed -n '$p')"
 [ -z "${CHOICE}" ] && exit 0
 
-# Inside tmux? If so we will switch this client to the target session.
 IN_TMUX=0
 [ "${TMUX-}" ] && IN_TMUX=1
 
 attach_normal() {
   if [ "$IN_TMUX" -eq 1 ]; then
-    # This moves your current client from its session to $CHOICE.
-    tmux switch-client -t "${CHOICE}"
+    tmux switch-client -t "$1"
   else
-    tmux attach-session -t "${CHOICE}"
+    tmux attach-session -t "$1"
   fi
 }
 
 attach_detach_others() {
   if [ "$IN_TMUX" -eq 1 ]; then
-    # Steal it: detach other clients viewing $CHOICE, then switch this client.
-    tmux detach-client -a -s "${CHOICE}" 2>/dev/null || true
-    tmux switch-client -t "${CHOICE}"
+    tmux detach-client -a -s "$1" 2>/dev/null || true
+    tmux switch-client -t "$1"
   else
-    tmux attach-session -d -t "${CHOICE}"
+    tmux attach-session -d -t "$1"
   fi
 }
 
-case "${KEY}" in
-  ctrl-d) attach_detach_others ;;
-  ""|enter|*) attach_normal ;;
+create_session() {
+  # prompt on the real TTY so it works after fzf
+  printf 'New session name: ' >/dev/tty
+  IFS= read -r name </dev/tty || name=
+  # trim spaces
+  name="$(printf '%s' "$name" | awk '{$1=$1;print}')"
+  [ -z "$name" ] && { printf 'Aborted: empty name.\n' >/dev/tty; exit 1; }
+
+  # create detached so behaviour is identical inside/outside tmux
+  # start in current working directory
+  tmux new-session -ds "$name" -c "$PWD"
+
+  # then attach/switch
+  if [ "$IN_TMUX" -eq 1 ]; then
+    tmux switch-client -t "$name"
+  else
+    tmux attach-session -t "$name"
+  fi
+}
+
+# route selection
+if [ "$CHOICE" = "[+ ] Create new session" ]; then
+  create_session
+  exit 0
+fi
+
+case "$KEY" in
+  ctrl-d) attach_detach_others "$CHOICE" ;;
+  ""|enter|*) attach_normal "$CHOICE" ;;
 esac
