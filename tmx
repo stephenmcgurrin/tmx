@@ -1,0 +1,64 @@
+#!/usr/bin/env sh
+# tmx: pick a tmux session with fzf and attach/switch to it.
+# deps: tmux, fzf
+# license: MIT
+
+set -eu
+
+need() {
+  command -v "$1" >/dev/null 2>&1 || {
+    printf '%s\n' "$1 not found. Install it and try again.\n" >&2
+    exit 127
+  }
+}
+need tmux
+need fzf
+
+# List session names only; empty if none.
+SESSIONS="$(tmux list-sessions -F '#S' 2>/dev/null || true)"
+if [ -z "${SESSIONS}" ]; then
+  printf '%s\n' "No active tmux sessions."
+  printf '%s\n' "Create one with: tmux new -s mysession"
+  exit 1
+fi
+
+# Choose. Enter = normal attach/switch. Ctrl-D = steal (detach others).
+SEL="$(
+  printf '%s\n' "${SESSIONS}" \
+  | fzf --height=50% --layout=reverse --border \
+        --prompt='tmux> ' --info=inline --ansi \
+        --expect=enter,ctrl-d || true
+)"
+[ -z "${SEL}" ] && exit 0
+
+KEY="$(printf '%s' "${SEL}" | sed -n '1p')"
+CHOICE="$(printf '%s' "${SEL}" | sed -n '$p')"
+[ -z "${CHOICE}" ] && exit 0
+
+# Inside tmux? If so we will switch this client to the target session.
+IN_TMUX=0
+[ "${TMUX-}" ] && IN_TMUX=1
+
+attach_normal() {
+  if [ "$IN_TMUX" -eq 1 ]; then
+    # This moves your current client from its session to $CHOICE.
+    tmux switch-client -t "${CHOICE}"
+  else
+    tmux attach-session -t "${CHOICE}"
+  fi
+}
+
+attach_detach_others() {
+  if [ "$IN_TMUX" -eq 1 ]; then
+    # Steal it: detach other clients viewing $CHOICE, then switch this client.
+    tmux detach-client -a -s "${CHOICE}" 2>/dev/null || true
+    tmux switch-client -t "${CHOICE}"
+  else
+    tmux attach-session -d -t "${CHOICE}"
+  fi
+}
+
+case "${KEY}" in
+  ctrl-d) attach_detach_others ;;
+  ""|enter|*) attach_normal ;;
+esac
