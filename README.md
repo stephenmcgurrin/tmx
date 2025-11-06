@@ -14,3 +14,10 @@ macOS with Homebrew:
 
 ```bash
 brew install tmux fzf
+
+## To use inside tmux: 
+Add the following to your .tmux.conf file
+#Prefix + P opens fzf in a popup; closes when you select.
+
+'''tmux
+bind-key -T prefix P display-popup -E -w 80% -h 80% -T "tmx" "$HOME/bin/tmx"
