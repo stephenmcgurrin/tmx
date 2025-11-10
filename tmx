@@ -28,13 +28,13 @@ SEL="$(
              --prompt='tmux> ' --info=inline --ansi \
              --expect=enter,ctrl-d \
              --preview '
-               if [ "{}" = "[+ ] Create new session" ]; then
+               if [ {} = "'\''[+ ] Create new session'\''" ]; then
                  printf "Create a new tmux session in: %s\n\n" "$PWD"
                  printf "Press Enter to name it.\n"
                else
                  # Show windows. Fallback to last 200 lines of the active pane if needed.
-                 '"$TMUX_BIN"' list-windows -F "#{window_index}: #{window_name}#{?window_active,  [active],}  [#{window_panes} panes]" -t "{}" 2>/dev/null \
-                 || '"$TMUX_BIN"' capture-pane -pt "{}" -S -200 2>/dev/null \
+                 '"$TMUX_BIN"' list-windows -F "#{window_index}: #{window_name}#{?window_active,  [active],}  [#{window_panes} panes]" -t {} 2>/dev/null \
+                 || '"$TMUX_BIN"' capture-pane -pt {} -S -200 2>/dev/null \
                  || echo "No windows or session not found."
                fi
              ' \

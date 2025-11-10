@@ -57,11 +57,22 @@ tmx
 Use the arrow keys or type to filter.  
 - **Enter** attaches to the selected session.  
 - **Ctrl-D** steals the session (detaches others, then attaches you).  
+- The preview pane lists windows/panes for the highlighted session and falls back to the last 200 lines of its active pane if window metadata is unavailable.
 
 If no sessions exist:
 ```bash
 tmux new -s mysession
 ```
+
+---
+
+## Manual testing
+
+These are the manual checks to run after changes (outside tmux and from a popup):
+
+1. `tmux new -s demo -d` to seed a session with windows/panes you expect to see
+2. Run `./tmx` from a normal shell; confirm the preview lists window names and shows pane output if windows disappear
+3. From inside tmux, run `tmux display-popup -E "$PWD/tmx"`; ensure the preview updates as you move the cursor and that selection still attaches/switches correctly
 
 ---
 
