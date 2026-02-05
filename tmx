@@ -1,0 +1,97 @@
+#!/usr/bin/env sh
+# tmx: pick or create a tmux session via fzf, then attach/switch.
+# deps: tmux, fzf
+# license: MIT
+TMUX_BIN="$(command -v tmux)"
+set -eu
+
+need() {
+  command -v "$1" >/dev/null 2>&1 || {
+    printf '%s\n' "$1 not found. Install it and try again.\n" >&2
+    exit 127
+  }
+}
+need tmux
+need fzf
+
+# list sessions; show a virtual "create" row first
+SESSIONS="$(tmux list-sessions -F '#S' 2>/dev/null || true)"
+
+# Build menu. First line is the create option.
+menu() {
+  printf '%s\n' "[+ ] Create new session"
+  [ -n "${SESSIONS}" ] && printf '%s\n' "${SESSIONS}" || :
+}
+
+SEL="$(
+  menu | fzf --height=50% --layout=reverse --border \
+             --prompt='tmux> ' --info=inline --ansi \
+             --expect=enter,ctrl-d \
+             --preview '
+               if [ {} = "'\''[+ ] Create new session'\''" ]; then
+                 printf "Create a new tmux session in: %s\n\n" "$PWD"
+                 printf "Press Enter to name it.\n"
+               else
+                 # Show windows. Fallback to last 200 lines of the active pane if needed.
+                 '"$TMUX_BIN"' list-windows -F "#{window_index}: #{window_name}#{?window_active,  [active],}  [#{window_panes} panes]" -t {} 2>/dev/null \
+                 || '"$TMUX_BIN"' capture-pane -pt {} -S -200 2>/dev/null \
+                 || echo "No windows or session not found."
+               fi
+             ' \
+             --preview-window=right,60%,border-left,wrap || true
+)"
+
+KEY="$(printf '%s' "${SEL}" | sed -n '1p')"
+CHOICE="$(printf '%s' "${SEL}" | sed -n '$p')"
+[ -z "${CHOICE}" ] && exit 0
+
+IN_TMUX=0
+[ "${TMUX-}" ] && IN_TMUX=1
+
+attach_normal() {
+  if [ "$IN_TMUX" -eq 1 ]; then
+    tmux switch-client -t "$1"
+  else
+    tmux attach-session -t "$1"
+  fi
+}
+
+attach_detach_others() {
+  if [ "$IN_TMUX" -eq 1 ]; then
+    tmux detach-client -a -s "$1" 2>/dev/null || true
+    tmux switch-client -t "$1"
+  else
+    tmux attach-session -d -t "$1"
+  fi
+}
+
+create_session() {
+  # prompt on the real TTY so it works after fzf
+  printf 'New session name: ' >/dev/tty
+  IFS= read -r name </dev/tty || name=
+  # trim spaces
+  name="$(printf '%s' "$name" | awk '{$1=$1;print}')"
+  [ -z "$name" ] && { printf 'Aborted: empty name.\n' >/dev/tty; exit 1; }
+
+  # create detached so behaviour is identical inside/outside tmux
+  # start in current working directory
+  tmux new-session -ds "$name" -c "$PWD"
+
+  # then attach/switch
+  if [ "$IN_TMUX" -eq 1 ]; then
+    tmux switch-client -t "$name"
+  else
+    tmux attach-session -t "$name"
+  fi
+}
+
+# route selection
+if [ "$CHOICE" = "[+ ] Create new session" ]; then
+  create_session
+  exit 0
+fi
+
+case "$KEY" in
+  ctrl-d) attach_detach_others "$CHOICE" ;;
+  ""|enter|*) attach_normal "$CHOICE" ;;
+esac
