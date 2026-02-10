@@ -24,7 +24,7 @@ menu() {
 }
 
 SEL="$(
-  menu | fzf --height=50% --layout=reverse --border \
+  menu | fzf --height=90% --layout=reverse --border \
              --prompt='tmux> ' --info=inline --ansi \
              --expect=enter,ctrl-d \
              --preview '
@@ -44,8 +44,9 @@ SEL="$(
 
                    # Show panes for this window
                    if [ "$pane_count" -eq 1 ]; then
-                     # Single pane - show full content
-                     '"$TMUX_BIN"' capture-pane -ep -t "$session:$idx.0" -S 0 2>/dev/null || echo "  (no content)"
+                     # Single pane - show full content (get first pane index dynamically)
+                     first_pane="$('"$TMUX_BIN"' list-panes -t "$session:$idx" -F "#{pane_index}" 2>/dev/null | head -1)"
+                     '"$TMUX_BIN"' capture-pane -ep -t "$session:$idx.$first_pane" -S 0 2>/dev/null || echo "  (no content)"
                    else
                      # Multiple panes - show them side by side or stacked
                      '"$TMUX_BIN"' list-panes -t "$session:$idx" -F "#{pane_index}|#{pane_active}|#{pane_width}|#{pane_height}|#{pane_left}|#{pane_top}" 2>/dev/null | while IFS="|" read -r pidx pactive pw ph pl pt; do
@@ -55,7 +56,7 @@ SEL="$(
                          printf "  \033[0;37m┌─ Pane %s ─\033[0m\n" "$pidx"
                        fi
                        # Show visible content (top 15 lines) of each pane
-                       '"$TMUX_BIN"' capture-pane -ep -t "$session:$idx.$pidx" -S 0 -E 14 2>/dev/null | sed "s/^/  │ /" || echo "  │ (no content)"
+                       '"$TMUX_BIN"' capture-pane -ep -t "$session:$idx.$pidx" -S 0 -E 15 2>/dev/null | sed "s/^/  │ /" || echo "  │ (no content)"
                        printf "  └─────────────\n"
                      done
                    fi
@@ -63,7 +64,7 @@ SEL="$(
                  done || echo "No windows or session not found."
                fi
              ' \
-             --preview-window=right,60%,border-left,wrap || true
+             --preview-window=right,75%,border-left,wrap || true
 )"
 
 KEY="$(printf '%s' "${SEL}" | sed -n '1p')"
