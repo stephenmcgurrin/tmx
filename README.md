@@ -1,8 +1,16 @@
-# tmx — local tmux session picker with fzf
+# tmx — tmux session picker with live preview
 
-Pick a tmux session using `fzf`.  
-Press **Enter** to attach (or switch if already inside tmux).  
+Interactive tmux session picker using `fzf` with live preview of windows and panes.
+Press **Enter** to attach (or switch if already inside tmux).
 Press **Ctrl-D** to attach and detach other clients.
+
+## Features
+
+- **Live session preview** — see all windows and panes with real content
+- **Color-coded windows** — active windows highlighted in green, others in blue
+- **Multi-pane visualization** — side-by-side view of split panes with borders
+- **Create new sessions** — quick session creation from the picker
+- **Smart pane capture** — shows recent content from each pane
 
 ---
 
@@ -34,8 +42,8 @@ Ensure `~/bin` is in your PATH (most Oh My Zsh setups already include it).
 Add the following to your `~/.tmux.conf` file:
 
 ```tmux
-# Prefix + P opens fzf in a popup; closes when you select.
-bind-key -T prefix P display-popup -E -w 80% -h 80% -T "tmx" "$HOME/bin/tmx"
+# Prefix + P opens tmx in a popup with live preview
+bind-key -T prefix P display-popup -E -w 90% -h 90% -T "tmx" "$HOME/bin/tmx"
 ```
 
 Reload your tmux configuration:
@@ -54,10 +62,14 @@ From any terminal (not already in tmux), run:
 tmx
 ```
 
-Use the arrow keys or type to filter.  
-- **Enter** attaches to the selected session.  
-- **Ctrl-D** steals the session (detaches others, then attaches you).  
-- The preview pane lists windows/panes for the highlighted session and falls back to the last 200 lines of its active pane if window metadata is unavailable.
+Use the arrow keys or type to filter.
+- **Enter** attaches to the selected session.
+- **Ctrl-D** steals the session (detaches others, then attaches you).
+- The **preview pane** (75% width on right) shows:
+  - All windows with color-coded headers (active/inactive)
+  - Each pane's recent content (~15 lines)
+  - Visual separators for multi-pane layouts
+  - Real-time content from running applications (vim, Claude Code, etc.)
 
 If no sessions exist:
 ```bash
@@ -68,11 +80,17 @@ tmux new -s mysession
 
 ## Manual testing
 
-These are the manual checks to run after changes (outside tmux and from a popup):
+These are the manual checks to run after changes:
 
-1. `tmux new -s demo -d` to seed a session with windows/panes you expect to see
-2. Run `./tmx` from a normal shell; confirm the preview lists window names and shows pane output if windows disappear
-3. From inside tmux, run `tmux display-popup -E "$PWD/tmx"`; ensure the preview updates as you move the cursor and that selection still attaches/switches correctly
+1. Create test session: `tmux new -s demo -d`
+2. Add multiple windows/panes with different content
+3. Run `./tmx` from a normal shell:
+   - Confirm preview shows all windows with color-coded headers
+   - Verify multi-pane layouts display correctly with borders
+   - Check that pane content is captured (including alternate screen apps like vim, Claude Code)
+4. From inside tmux, run `tmux display-popup -E "$PWD/tmx"`:
+   - Ensure preview updates as you navigate
+   - Verify selection attaches/switches correctly
 
 ---
 
