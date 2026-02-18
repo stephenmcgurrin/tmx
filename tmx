@@ -3,6 +3,7 @@
 # deps: tmux, fzf
 # license: MIT
 TMUX_BIN="$(command -v tmux)"
+HIDDEN_FILE="${HOME}/.tmx-hidden-sessions"
 set -eu
 
 need() {
@@ -14,23 +15,120 @@ need() {
 need tmux
 need fzf
 
+# Load hidden sessions into memory
+load_hidden_sessions() {
+  [ -f "$HIDDEN_FILE" ] && cat "$HIDDEN_FILE" || true
+}
+
+# Check if a session is hidden
+is_hidden() {
+  session="$1"
+  hidden_sessions="$(load_hidden_sessions)"
+  printf '%s\n' "$hidden_sessions" | grep -Fx "$session" >/dev/null 2>&1
+}
+
+# Toggle a session's hidden state
+toggle_hidden() {
+  session="$1"
+  if is_hidden "$session"; then
+    # Unhide: remove from file
+    if [ -f "$HIDDEN_FILE" ]; then
+      grep -Fxv "$session" "$HIDDEN_FILE" > "${HIDDEN_FILE}.tmp" 2>/dev/null || true
+      mv "${HIDDEN_FILE}.tmp" "$HIDDEN_FILE"
+    fi
+  else
+    # Hide: add to file
+    printf '%s\n' "$session" >> "$HIDDEN_FILE"
+  fi
+}
+
 # list sessions; show a virtual "create" row first
 SESSIONS="$(tmux list-sessions -F '#S' 2>/dev/null || true)"
 
-# Build menu. First line is the create option.
+# Build menu with Active and Hidden sections
 menu() {
   printf '%s\n' "[+ ] Create new session"
-  [ -n "${SESSIONS}" ] && printf '%s\n' "${SESSIONS}" || :
+
+  if [ -n "${SESSIONS}" ]; then
+    hidden_sessions="$(load_hidden_sessions)"
+    active_sessions=""
+    hidden_list=""
+
+    # Categorize sessions
+    while IFS= read -r session; do
+      if printf '%s\n' "$hidden_sessions" | grep -Fx "$session" >/dev/null 2>&1; then
+        hidden_list="${hidden_list}${session}"$'\n'
+      else
+        active_sessions="${active_sessions}${session}"$'\n'
+      fi
+    done <<EOF
+$SESSIONS
+EOF
+
+    # Print Active Sessions section
+    if [ -n "$active_sessions" ]; then
+      printf '\033[1;36m━━━ Active Sessions ━━━\033[0m\n'
+      printf '%s' "$active_sessions"
+    fi
+
+    # Print Hidden Sessions section
+    if [ -n "$hidden_list" ]; then
+      printf '\033[1;90m━━━ Hidden Sessions ━━━\033[0m\n'
+      printf '%s' "$hidden_list"
+    fi
+  fi
 }
 
 SEL="$(
   menu | fzf --height=90% --layout=reverse --border \
              --prompt='tmux> ' --info=inline --ansi \
              --expect=enter,ctrl-d \
+             --header='Enter: attach | Ctrl-d: attach+detach others | Ctrl-h: toggle hide' \
+             --bind "ctrl-h:execute-silent(
+               session={}
+               # Skip action if it's a header line or create option
+               case \"\$session\" in
+                 *━━━*|''[+\ ]*) exit 0 ;;
+               esac
+               # Toggle hidden state
+               if grep -Fxq \"\$session\" '$HIDDEN_FILE' 2>/dev/null; then
+                 grep -Fxv \"\$session\" '$HIDDEN_FILE' > '${HIDDEN_FILE}.tmp' 2>/dev/null || true
+                 mv '${HIDDEN_FILE}.tmp' '$HIDDEN_FILE'
+               else
+                 printf '%s\n' \"\$session\" >> '$HIDDEN_FILE'
+               fi
+             )+reload(
+               printf '%s\n' '[+ ] Create new session'
+               SESSIONS=\$(tmux list-sessions -F '#S' 2>/dev/null || true)
+               if [ -n \"\$SESSIONS\" ]; then
+                 hidden_sessions=\$([ -f '$HIDDEN_FILE' ] && cat '$HIDDEN_FILE' || true)
+                 active_sessions=\"\"
+                 hidden_list=\"\"
+                 while IFS= read -r session; do
+                   if printf '%s\n' \"\$hidden_sessions\" | grep -Fx \"\$session\" >/dev/null 2>&1; then
+                     hidden_list=\"\${hidden_list}\${session}\"\$'\n'
+                   else
+                     active_sessions=\"\${active_sessions}\${session}\"\$'\n'
+                   fi
+                 done <<EOF_INNER
+\$SESSIONS
+EOF_INNER
+                 if [ -n \"\$active_sessions\" ]; then
+                   printf '\033[1;36m━━━ Active Sessions ━━━\033[0m\n'
+                   printf '%s' \"\$active_sessions\"
+                 fi
+                 if [ -n \"\$hidden_list\" ]; then
+                   printf '\033[1;90m━━━ Hidden Sessions ━━━\033[0m\n'
+                   printf '%s' \"\$hidden_list\"
+                 fi
+               fi
+             )" \
              --preview '
                if [ {} = "'\''[+ ] Create new session'\''" ]; then
                  printf "Create a new tmux session in: %s\n\n" "$PWD"
                  printf "Press Enter to name it.\n"
+               elif printf "%s" "{}" | grep -q "━━━"; then
+                 printf "Section header - select a session below\n"
                else
                  # Show live preview of session windows and panes
                  session={}
@@ -70,6 +168,11 @@ SEL="$(
 KEY="$(printf '%s' "${SEL}" | sed -n '1p')"
 CHOICE="$(printf '%s' "${SEL}" | sed -n '$p')"
 [ -z "${CHOICE}" ] && exit 0
+
+# Skip if user selected a section header
+case "${CHOICE}" in
+  *━━━*) exit 0 ;;
+esac
 
 IN_TMUX=0
 [ "${TMUX-}" ] && IN_TMUX=1
