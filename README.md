@@ -1,98 +1,60 @@
-# tmx — tmux session picker with live preview
+# tmx — tmux session picker
 
-Interactive tmux session picker using `fzf` with live preview of windows and panes.
-Press **Enter** to attach (or switch if already inside tmux).
-Press **Ctrl-D** to attach and detach other clients.
-
-## Features
-
-- **Live session preview** — see all windows and panes with real content
-- **Color-coded windows** — active windows highlighted in green, others in blue
-- **Multi-pane visualization** — side-by-side view of split panes with borders
-- **Create new sessions** — quick session creation from the picker
-- **Smart pane capture** — shows recent content from each pane
-
----
+Interactive tmux session manager using `fzf` with live preview, hidden sessions, and vim-style navigation.
 
 ## Requirements
 
 - tmux 2.6+
 - fzf 0.21+
-- macOS, POSIX `sh` (works from zsh, bash)
+- POSIX `sh`
 
----
-
-## Installation (macOS with Homebrew)
+## Install
 
 ```bash
 brew install tmux fzf
+cp tmx ~/bin/tmx && chmod +x ~/bin/tmx
 ```
 
-Copy the `tmx` script into your `~/bin` directory and make it executable:
-```bash
-chmod +x ~/bin/tmx
-```
+Ensure `~/bin` is in your PATH.
 
-Ensure `~/bin` is in your PATH (most Oh My Zsh setups already include it).
+## Usage
 
----
-
-## To use inside tmux
-
-Add the following to your `~/.tmux.conf` file:
-
-```tmux
-# Prefix + P opens tmx in a popup with live preview
-bind-key -T prefix P display-popup -E -w 90% -h 90% -T "tmx" "$HOME/bin/tmx"
-```
-
-Reload your tmux configuration:
-```bash
-tmux source-file ~/.tmux.conf
-```
-
-Now press **Prefix + P** to open the `tmx` picker inside a popup window.
-
----
-
-## Usage Outside tmux
-
-From any terminal (not already in tmux), run:
 ```bash
 tmx
 ```
 
-Use the arrow keys or type to filter.
-- **Enter** attaches to the selected session.
-- **Ctrl-D** steals the session (detaches others, then attaches you).
-- The **preview pane** (75% width on right) shows:
-  - All windows with color-coded headers (active/inactive)
-  - Each pane's recent content (~15 lines)
-  - Visual separators for multi-pane layouts
-  - Real-time content from running applications (vim, Claude Code, etc.)
+### Navigation (vim-style)
 
-If no sessions exist:
-```bash
-tmux new -s mysession
+| Key | Action |
+|-----|--------|
+| `j` / `k` | Move down / up |
+| `g` / `G` | Jump to top / bottom |
+| `/` | Enter search mode |
+| `Esc` | Exit search mode |
+| `q` | Quit |
+| `Enter` | Attach to session |
+| `Ctrl-d` | Attach and detach other clients |
+
+### Session management
+
+| Key | Action |
+|-----|--------|
+| `Ctrl-h` | Toggle hide/unhide a session |
+| `Ctrl-a` | Toggle hidden sessions visibility |
+
+### Creating a new session
+
+Select `[+ ] Create new session`, enter a name, then pick a base directory from the fzf picker. Press `Esc` to skip and use the current directory.
+
+## tmux popup integration
+
+Add to `~/.tmux.conf`:
+
+```tmux
+bind-key -T prefix P display-popup -E -w 90% -h 90% -T "tmx" "$HOME/bin/tmx"
 ```
 
----
-
-## Manual testing
-
-These are the manual checks to run after changes:
-
-1. Create test session: `tmux new -s demo -d`
-2. Add multiple windows/panes with different content
-3. Run `./tmx` from a normal shell:
-   - Confirm preview shows all windows with color-coded headers
-   - Verify multi-pane layouts display correctly with borders
-   - Check that pane content is captured (including alternate screen apps like vim, Claude Code)
-4. From inside tmux, run `tmux display-popup -E "$PWD/tmx"`:
-   - Ensure preview updates as you navigate
-   - Verify selection attaches/switches correctly
-
----
+Then `Prefix + P` opens tmx in a popup.
 
 ## License
 

@@ -88,7 +88,11 @@ SEL="$(
   menu $SHOW_HIDDEN | fzf --height=90% --layout=reverse --border \
              --prompt='tmux> ' --info=inline --ansi \
              --expect=enter,ctrl-d \
-             --header='Enter: attach | Ctrl-d: attach+detach | Ctrl-h: toggle hide | Ctrl-a: show hidden' \
+             --header='j/k: navigate | /: search | Enter: attach | Ctrl-d: attach+detach | Ctrl-h: hide | Ctrl-a: show hidden' \
+             --bind 'start:disable-search' \
+             --bind 'j:down,k:up,g:first,G:last,q:abort' \
+             --bind '/:unbind(j,k,g,G,q)+enable-search+clear-query+change-prompt(search> )' \
+             --bind 'esc:rebind(j,k,g,G,q)+disable-search+clear-query+change-prompt(tmux> )' \
              --bind "ctrl-a:reload(
                if [ -f /tmp/tmx-show-hidden ] && [ \"\$(cat /tmp/tmx-show-hidden)\" = \"1\" ]; then
                  printf '0' > /tmp/tmx-show-hidden
