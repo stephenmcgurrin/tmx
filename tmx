@@ -256,6 +256,20 @@ attach_detach_others() {
   fi
 }
 
+pick_directory() {
+  dirs="$(find "$HOME" -maxdepth 3 -type d \
+    -not -path '*/\.*' \
+    -not -path '*/node_modules/*' \
+    -not -path '*/__pycache__/*' \
+    2>/dev/null | sort)"
+  printf '%s\n' "$dirs" | \
+  fzf --height=90% --layout=reverse --border \
+      --prompt='dir> ' --info=inline \
+      --header="Enter: select directory | Esc: use current dir ($(pwd))" \
+      --preview 'ls -la --color=always {} 2>/dev/null || ls -la {}' \
+      --preview-window=right,50%,border-left || true
+}
+
 create_session() {
   # prompt on the real TTY so it works after fzf
   printf 'New session name: ' >/dev/tty
@@ -264,9 +278,12 @@ create_session() {
   name="$(printf '%s' "$name" | awk '{$1=$1;print}')"
   [ -z "$name" ] && { printf 'Aborted: empty name.\n' >/dev/tty; exit 1; }
 
+  # pick a base directory, default to $PWD if skipped
+  dir="$(pick_directory)"
+  [ -z "$dir" ] && dir="$PWD"
+
   # create detached so behaviour is identical inside/outside tmux
-  # start in current working directory
-  tmux new-session -ds "$name" -c "$PWD"
+  tmux new-session -ds "$name" -c "$dir"
 
   # then attach/switch
   if [ "$IN_TMUX" -eq 1 ]; then
