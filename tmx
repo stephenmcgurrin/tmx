@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # tmx: pick or create a tmux session via fzf, then attach/switch.
+# author: Stephen McGurrin, 2026
 # deps: tmux, fzf
 # license: MIT
 TMUX_BIN="$(command -v tmux)"
