@@ -92,8 +92,8 @@ SEL="$(
              --header='j/k: navigate | /: search | Enter: attach | Ctrl-d: attach+detach | r: rename | Ctrl-h: hide | Ctrl-a: show hidden' \
              --bind 'start:disable-search' \
              --bind 'j:down,k:up,g:first,G:last,q:abort' \
-             --bind '/:unbind(j,k,g,G,q)+enable-search+clear-query+change-prompt(search> )' \
-             --bind 'esc:rebind(j,k,g,G,q)+disable-search+clear-query+change-prompt(tmux> )' \
+             --bind '/:unbind(j,k,g,G,q,r)+enable-search+clear-query+change-prompt(search> )' \
+             --bind 'esc:rebind(j,k,g,G,q,r)+disable-search+clear-query+change-prompt(tmux> )' \
              --bind "r:execute(
                session={}
                case \"\$session\" in
