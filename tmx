@@ -89,11 +89,56 @@ SEL="$(
   menu $SHOW_HIDDEN | fzf --height=90% --layout=reverse --border \
              --prompt='tmux> ' --info=inline --ansi \
              --expect=enter,ctrl-d \
-             --header='j/k: navigate | /: search | Enter: attach | Ctrl-d: attach+detach | Ctrl-h: hide | Ctrl-a: show hidden' \
+             --header='j/k: navigate | /: search | Enter: attach | Ctrl-d: attach+detach | r: rename | Ctrl-h: hide | Ctrl-a: show hidden' \
              --bind 'start:disable-search' \
              --bind 'j:down,k:up,g:first,G:last,q:abort' \
              --bind '/:unbind(j,k,g,G,q)+enable-search+clear-query+change-prompt(search> )' \
              --bind 'esc:rebind(j,k,g,G,q)+disable-search+clear-query+change-prompt(tmux> )' \
+             --bind "r:execute(
+               session={}
+               case \"\$session\" in
+                 *━━━*|'[+ ] Create new session') exit 0 ;;
+               esac
+               session=\$(printf '%s' \"\$session\" | sed 's/^[[:space:]]*//')
+               printf 'Rename \"%s\" to: ' \"\$session\" >/dev/tty
+               IFS= read -r newname </dev/tty || newname=
+               newname=\$(printf '%s' \"\$newname\" | awk '{\$1=\$1;print}')
+               [ -z \"\$newname\" ] && exit 0
+               tmux rename-session -t \"\$session\" \"\$newname\"
+               # Update hidden file if session was hidden
+               if grep -Fxq \"\$session\" '$HIDDEN_FILE' 2>/dev/null; then
+                 sed -i '' \"s|^\$session\$|\$newname|\" '$HIDDEN_FILE'
+               fi
+             )+reload(
+               show_hidden=0
+               [ -f /tmp/tmx-show-hidden ] && show_hidden=\$(cat /tmp/tmx-show-hidden)
+               SESSIONS=\$(tmux list-sessions -F '#S' 2>/dev/null || true)
+               printf '%s\n' '[+ ] Create new session'
+               if [ -n \"\$SESSIONS\" ]; then
+                 hidden_sessions=\$([ -f '$HIDDEN_FILE' ] && cat '$HIDDEN_FILE' || true)
+                 while IFS= read -r session; do
+                   if ! printf '%s\n' \"\$hidden_sessions\" | grep -Fx \"\$session\" >/dev/null 2>&1; then
+                     printf '%s\n' \"\$session\"
+                   fi
+                 done <<EOF_INNER
+\$SESSIONS
+EOF_INNER
+                 if [ \"\$show_hidden\" = \"1\" ]; then
+                   hidden_list=\"\"
+                   while IFS= read -r session; do
+                     if printf '%s\n' \"\$hidden_sessions\" | grep -Fx \"\$session\" >/dev/null 2>&1; then
+                       hidden_list=\"\${hidden_list}\${session}\"\$'\n'
+                     fi
+                   done <<EOF_INNER2
+\$SESSIONS
+EOF_INNER2
+                   if [ -n \"\$hidden_list\" ]; then
+                     printf '\033[1;90m━━━ Hidden (press ctrl-a to hide) ━━━\033[0m\n'
+                     printf '%s' \"\$hidden_list\" | sed 's/^/        /'
+                   fi
+                 fi
+               fi
+             )" \
              --bind "ctrl-a:reload(
                if [ -f /tmp/tmx-show-hidden ] && [ \"\$(cat /tmp/tmx-show-hidden)\" = \"1\" ]; then
                  printf '0' > /tmp/tmx-show-hidden
