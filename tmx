@@ -11,7 +11,8 @@ HIDDEN_FILE="${HOME}/.tmx-hidden-sessions"
 # Resolve script to absolute path for reliable fzf bind callbacks
 case "$0" in
   /*) SCRIPT="$0" ;;
-  *)  SCRIPT="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")" ;;
+  */*) SCRIPT="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")" ;;
+  *)   SCRIPT="$(command -v "$0")" ;;
 esac
 
 # ─── Helper functions ──────────────────────────────────────────
@@ -208,12 +209,15 @@ $mnt_dirs"
     all_dirs="$home_dirs"
   fi
 
-  printf '%s\n' "$all_dirs" | \
+  dir="$(printf '%s\n' "$all_dirs" | \
   fzf --height=90% --layout=reverse --border \
       --prompt='dir> ' --info=inline \
       --header="Enter: select | Esc: use current dir ($(pwd))${ext_header}" \
       --preview 'case {} in ---*) echo "── External Volumes ──";; *) ls -la {} 2>/dev/null || ls -la {};; esac' \
-      --preview-window=right,50%,border-left || true
+      --preview-window=right,50%,border-left || true)"
+  # Reject the separator line — treat as Esc (use current dir)
+  case "$dir" in ---external---) dir="" ;; esac
+  printf '%s\n' "$dir"
 }
 
 # ─── Create new session ────────────────────────────────────────
@@ -327,6 +331,9 @@ esac
 
 set -eu
 
+# Guard: if we somehow reach main with args, bail silently (fzf reload races, etc.)
+[ $# -eq 0 ] || exit 0
+
 need() {
   command -v "$1" >/dev/null 2>&1 || {
     printf '%s\n' "$1 not found. Install it and try again.\n" >&2
@@ -370,9 +377,9 @@ CHOICE="$(printf '%s' "${SEL}" | sed -n '$p')"
 # Strip leading spaces (from hidden-section indenting)
 CHOICE="$(clean_sel "$CHOICE")"
 
-# Skip section headers
+# Skip section headers and leftovers (fzf may emit noise on exit)
 case "${CHOICE}" in
-  *━━━*) exit 0 ;;
+  *━━━*|[eE][xX][iI][tT][eE][dD]*) exit 0 ;;
 esac
 
 # ─── Route selection ───────────────────────────────────────────
@@ -380,9 +387,9 @@ esac
 if [ "$CHOICE" = "[+ ] Create new session" ]; then
   create_session
   exit 0
+else
+  case "$KEY" in
+    ctrl-d) attach_detach_others "$CHOICE" ;;
+    ""|enter|*) attach_normal "$CHOICE" ;;
+  esac
 fi
-
-case "$KEY" in
-  ctrl-d) attach_detach_others "$CHOICE" ;;
-  ""|enter|*) attach_normal "$CHOICE" ;;
-esac
