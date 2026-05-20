@@ -3,8 +3,328 @@
 # author: Stephen McGurrin, 2026
 # deps: tmux, fzf
 # license: MIT
+
+# ─── Globals (set early — used by both dispatch helpers and main) ───
 TMUX_BIN="$(command -v tmux)"
 HIDDEN_FILE="${HOME}/.tmx-hidden-sessions"
+
+# Resolve script to absolute path for reliable fzf bind callbacks
+case "$0" in
+  /*) SCRIPT="$0" ;;
+  *)  SCRIPT="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")" ;;
+esac
+
+# ─── Helper functions ──────────────────────────────────────────
+
+clean_sel() { printf '%s' "$1" | sed 's/^[[:space:]]*//'; }
+
+skip_header() {
+  case "$1" in *━━━*|'[+ ] Create new session'|'') return 1 ;; esac
+  return 0
+}
+
+# Print every hidden session (one per line); empty if no hidden file.
+load_hidden_sessions() {
+  [ -f "$HIDDEN_FILE" ] && cat "$HIDDEN_FILE" || true
+}
+
+# Return 0 (success) if $1 is in the hidden list.
+is_hidden() {
+  session="$1"
+  hidden_sessions="$(load_hidden_sessions)"
+  printf '%s\n' "$hidden_sessions" | grep -Fx "$session" >/dev/null 2>&1
+}
+
+# Toggle $1 in/out of the hidden file.
+toggle_hidden() {
+  session="$1"
+  if is_hidden "$session"; then
+    if [ -f "$HIDDEN_FILE" ]; then
+      grep -Fxv "$session" "$HIDDEN_FILE" > "${HIDDEN_FILE}.tmp" 2>/dev/null || true
+      mv "${HIDDEN_FILE}.tmp" "$HIDDEN_FILE"
+    fi
+  else
+    printf '%s\n' "$session" >> "$HIDDEN_FILE"
+  fi
+}
+
+# ─── Single source of truth: render the session picker menu ────
+# $1 = 0|1  (whether to show the "Hidden" section)
+render_sessions() {
+  show_hidden="${1:-0}"
+  printf '%s\n' "[+ ] Create new session"
+
+  sessions="$("$TMUX_BIN" list-sessions -F '#S' 2>/dev/null || true)"
+  [ -z "$sessions" ] && return 0
+
+  hidden_sessions="$(load_hidden_sessions)"
+
+  # ---- active (non-hidden) sessions ----
+  while IFS= read -r s; do
+    if ! printf '%s\n' "$hidden_sessions" | grep -Fx "$s" >/dev/null 2>&1; then
+      printf '%s\n' "$s"
+    fi
+  done <<EOF
+$sessions
+EOF
+
+  # ---- hidden section (only when toggled on) ----
+  if [ "$show_hidden" = "1" ]; then
+    hidden_list=""
+    while IFS= read -r s; do
+      if printf '%s\n' "$hidden_sessions" | grep -Fx "$s" >/dev/null 2>&1; then
+        hidden_list="${hidden_list}${s}
+"
+      fi
+    done <<EOF
+$sessions
+EOF
+
+    if [ -n "$hidden_list" ]; then
+      printf '\033[1;90m━━━ Hidden (press ctrl-a to hide) ━━━\033[0m\n'
+      printf '%s' "$hidden_list" | sed 's/^/        /'
+    fi
+  fi
+}
+
+# ─── Preview helper ────────────────────────────────────────────
+
+preview_session() {
+  s="$1"
+  case "$s" in
+    '[+ ] Create new session')
+      printf "Create a new tmux session\n\n"
+      printf "Directory: %s\n\n" "$PWD"
+      printf "Press Enter to name it.\n"
+      ;;
+    *━━━*)
+      printf "Hidden sessions — ctrl-a to hide, ctrl-h to hide/unhide, r to rename, ctrl-x to kill\n"
+      ;;
+    *)
+      s="$(clean_sel "$s")"
+      "$TMUX_BIN" list-windows -t "$s" \
+        -F "#{window_index}|#{window_name}|#{window_active}|#{window_panes}" \
+        2>/dev/null | while IFS='|' read -r idx name active panes; do
+        if [ "$active" = "1" ]; then
+          printf '\033[1;32m━━━ Window %s: %s (active) ━━━\033[0m\n' "$idx" "$name"
+        else
+          printf '\033[1;34m━━━ Window %s: %s ━━━\033[0m\n' "$idx" "$name"
+        fi
+        if [ "$panes" -eq 1 ]; then
+          first="$("$TMUX_BIN" list-panes -t "$s:$idx" -F "#{pane_index}" 2>/dev/null | head -1)"
+          "$TMUX_BIN" capture-pane -ep -t "$s:$idx.$first" -S 0 2>/dev/null \
+            || echo "  (no content)"
+        else
+          "$TMUX_BIN" list-panes -t "$s:$idx" \
+            -F "#{pane_index}|#{pane_active}" 2>/dev/null | while IFS='|' read -r pi pa; do
+            if [ "$pa" = "1" ]; then
+              printf '  \033[1;33m┌─ Pane %s (active) ─\033[0m\n' "$pi"
+            else
+              printf '  \033[0;37m┌─ Pane %s ─\033[0m\n' "$pi"
+            fi
+            "$TMUX_BIN" capture-pane -ep -t "$s:$idx.$pi" -S 0 -E 15 2>/dev/null \
+              | sed 's/^/  │ /' || echo '  │ (no content)'
+            printf '  └─────────────\n'
+          done
+        fi
+        printf '\n'
+      done || echo "No windows or session not found."
+      ;;
+  esac
+}
+
+# ─── Attach helpers ────────────────────────────────────────────
+
+IN_TMUX=0
+[ "${TMUX-}" ] && IN_TMUX=1
+
+attach_normal() {
+  if [ "$IN_TMUX" -eq 1 ]; then
+    "$TMUX_BIN" switch-client -t "$1"
+  else
+    "$TMUX_BIN" attach-session -t "$1"
+  fi
+}
+
+attach_detach_others() {
+  if [ "$IN_TMUX" -eq 1 ]; then
+    "$TMUX_BIN" detach-client -a -s "$1" 2>/dev/null || true
+    "$TMUX_BIN" switch-client -t "$1"
+  else
+    "$TMUX_BIN" attach-session -d -t "$1"
+  fi
+}
+
+# ─── Directory scanner / picker ─────────────────────────────────
+
+scan_dirs() {
+  find "$1" -maxdepth 3 -type d \
+    -not -path '*/\.*' -not -path '*/node_modules/*' -not -path '*/__pycache__/*' \
+    2>/dev/null | sort
+}
+
+pick_directory() {
+  home_dirs="$(scan_dirs "$HOME")"
+  ext_dirs=""
+  ext_header=""
+
+  # macOS external volumes
+  if [ -d /Volumes ]; then
+    boot_vol="$(df / 2>/dev/null | awk 'NR==2{print $NF}')"
+    for vol in /Volumes/*; do
+      [ -d "$vol" ] || continue
+      [ "$vol" = "$boot_vol" ] && continue
+      vol_dirs="$(scan_dirs "$vol")"
+      if [ -n "$vol_dirs" ]; then
+        if [ -n "$ext_dirs" ]; then
+          ext_dirs="$ext_dirs
+$vol_dirs"
+        else
+          ext_dirs="$vol_dirs"
+        fi
+      fi
+    done
+    [ -n "$ext_dirs" ] && ext_header=" | External volumes included"
+  # Linux external drives
+  elif [ -d /mnt ] || [ -d /media ]; then
+    for mnt in /mnt/* /media/*; do
+      [ -d "$mnt" ] || continue
+      mnt_dirs="$(scan_dirs "$mnt")"
+      if [ -n "$mnt_dirs" ]; then
+        if [ -n "$ext_dirs" ]; then
+          ext_dirs="$ext_dirs
+$mnt_dirs"
+        else
+          ext_dirs="$mnt_dirs"
+        fi
+      fi
+    done
+    [ -n "$ext_dirs" ] && ext_header=" | External drives included"
+  fi
+
+  if [ -n "$ext_dirs" ]; then
+    all_dirs="$(printf '%s\n---external---\n%s' "$home_dirs" "$ext_dirs")"
+  else
+    all_dirs="$home_dirs"
+  fi
+
+  printf '%s\n' "$all_dirs" | \
+  fzf --height=90% --layout=reverse --border \
+      --prompt='dir> ' --info=inline \
+      --header="Enter: select | Esc: use current dir ($(pwd))${ext_header}" \
+      --preview 'case {} in ---*) echo "── External Volumes ──";; *) ls -la {} 2>/dev/null || ls -la {};; esac' \
+      --preview-window=right,50%,border-left || true
+}
+
+# ─── Create new session ────────────────────────────────────────
+
+create_session() {
+  printf 'New session name: ' >/dev/tty
+  IFS= read -r name </dev/tty || name=
+  name="$(printf '%s' "$name" | awk '{$1=$1;print}')"
+  [ -z "$name" ] && { printf 'Aborted: empty name.\n' >/dev/tty; exit 1; }
+
+  dir="$(pick_directory)"
+  [ -z "$dir" ] && dir="$PWD"
+
+  "$TMUX_BIN" new-session -ds "$name" -c "$dir"
+  attach_normal "$name"
+}
+
+# ─── Internal dispatch (called by fzf reload / execute binds) ──
+# These run BEFORE set -eu so reloads never hit spurious failures.
+
+case "${1:-}" in
+
+  --help|-h)
+    printf '%s\n' "tmx — tmux session picker via fzf"
+    printf '%s\n' ""
+    printf '%s\n' "  j/k: up/down  g/G: top/bottom  /: search  Esc: exit search  q: quit"
+    printf '%s\n' "  Enter: attach   Ctrl-d: attach+detach   r: rename"
+    printf '%s\n' "  Ctrl-h: hide/unhide   Ctrl-a: toggle hidden   Ctrl-x: kill"
+    exit 0
+    ;;
+
+  # usage:  tmx --internal-render <show-hidden-flag-file>
+  --internal-render)
+    flag_file="$2"
+    show="$(cat "$flag_file" 2>/dev/null || echo 0)"
+    render_sessions "$show"
+    exit 0
+    ;;
+
+  # usage:  tmx --internal-toggle-display <show-hidden-flag-file>
+  --internal-toggle-display)
+    flag_file="$2"
+    current="$(cat "$flag_file" 2>/dev/null || echo 0)"
+    if [ "$current" = "1" ]; then
+      printf '0' > "$flag_file"
+      render_sessions 0
+    else
+      printf '1' > "$flag_file"
+      render_sessions 1
+    fi
+    exit 0
+    ;;
+
+  # usage:  tmx --internal-rename <session-name>
+  --internal-rename)
+    session="$(clean_sel "$2")"
+    skip_header "$session" || exit 0
+
+    printf 'Rename "%s" to: ' "$session" >/dev/tty
+    IFS= read -r newname </dev/tty || newname=
+    newname="$(printf '%s' "$newname" | awk '{$1=$1;print}')"
+    [ -z "$newname" ] && exit 0
+
+    "$TMUX_BIN" rename-session -t "$session" "$newname"
+
+    if grep -Fxq "$session" "$HIDDEN_FILE" 2>/dev/null; then
+      grep -Fxv "$session" "$HIDDEN_FILE" > "${HIDDEN_FILE}.tmp" 2>/dev/null || true
+      printf '%s\n' "$newname" >> "${HIDDEN_FILE}.tmp"
+      mv "${HIDDEN_FILE}.tmp" "$HIDDEN_FILE"
+    fi
+    exit 0
+    ;;
+
+  # usage:  tmx --internal-toggle-hidden <session-name>
+  --internal-toggle-hidden)
+    session="$(clean_sel "$2")"
+    skip_header "$session" || exit 0
+    toggle_hidden "$session"
+    exit 0
+    ;;
+
+  # usage:  tmx --internal-kill-session <session-name>
+  --internal-kill-session)
+    session="$(clean_sel "$2")"
+    skip_header "$session" || exit 0
+
+    printf 'Kill session "%s"? [y/N] ' "$session" >/dev/tty
+    IFS= read -r ans </dev/tty || exit 0
+    case "$ans" in [yY]|[yY][eE][sS]) ;; *) exit 0 ;; esac
+
+    "$TMUX_BIN" kill-session -t "$session"
+
+    if grep -Fxq "$session" "$HIDDEN_FILE" 2>/dev/null; then
+      grep -Fxv "$session" "$HIDDEN_FILE" > "${HIDDEN_FILE}.tmp" 2>/dev/null || true
+      mv "${HIDDEN_FILE}.tmp" "$HIDDEN_FILE"
+    fi
+    exit 0
+    ;;
+
+  # usage:  tmx --internal-preview <session-name>
+  --internal-preview)
+    preview_session "${2:-}"
+    exit 0
+    ;;
+
+esac
+
+# ═══════════════════════════════════════════════════════════════
+#  Main script
+# ═══════════════════════════════════════════════════════════════
+
 set -eu
 
 need() {
@@ -16,289 +336,47 @@ need() {
 need tmux
 need fzf
 
-# Load hidden sessions into memory
-load_hidden_sessions() {
-  [ -f "$HIDDEN_FILE" ] && cat "$HIDDEN_FILE" || true
-}
+# Secure temp file for the show-hidden toggle (no predictable /tmp path)
+SHOW_HIDDEN_FILE="$(mktemp)"
+trap 'rm -f "$SHOW_HIDDEN_FILE"' EXIT
+printf '0' > "$SHOW_HIDDEN_FILE"
 
-# Check if a session is hidden
-is_hidden() {
-  session="$1"
-  hidden_sessions="$(load_hidden_sessions)"
-  printf '%s\n' "$hidden_sessions" | grep -Fx "$session" >/dev/null 2>&1
-}
-
-# Toggle a session's hidden state
-toggle_hidden() {
-  session="$1"
-  if is_hidden "$session"; then
-    # Unhide: remove from file
-    if [ -f "$HIDDEN_FILE" ]; then
-      grep -Fxv "$session" "$HIDDEN_FILE" > "${HIDDEN_FILE}.tmp" 2>/dev/null || true
-      mv "${HIDDEN_FILE}.tmp" "$HIDDEN_FILE"
-    fi
-  else
-    # Hide: add to file
-    printf '%s\n' "$session" >> "$HIDDEN_FILE"
-  fi
-}
-
-# list sessions; show a virtual "create" row first
-SESSIONS="$(tmux list-sessions -F '#S' 2>/dev/null || true)"
-
-# Build menu - only show active sessions by default
-menu() {
-  show_hidden="${1:-0}"
-  printf '%s\n' "[+ ] Create new session"
-
-  if [ -n "${SESSIONS}" ]; then
-    hidden_sessions="$(load_hidden_sessions)"
-
-    # Show active sessions
-    while IFS= read -r session; do
-      if ! printf '%s\n' "$hidden_sessions" | grep -Fx "$session" >/dev/null 2>&1; then
-        printf '%s\n' "$session"
-      fi
-    done <<EOF
-$SESSIONS
-EOF
-
-    # Optionally show hidden sessions if toggle is on
-    if [ "$show_hidden" = "1" ]; then
-      hidden_list=""
-      while IFS= read -r session; do
-        if printf '%s\n' "$hidden_sessions" | grep -Fx "$session" >/dev/null 2>&1; then
-          hidden_list="${hidden_list}${session}"$'\n'
-        fi
-      done <<EOF
-$SESSIONS
-EOF
-
-      if [ -n "$hidden_list" ]; then
-        printf '\033[1;90m━━━ Hidden (press ctrl-a to hide) ━━━\033[0m\n'
-        printf '%s' "$hidden_list" | sed 's/^/        /'
-      fi
-    fi
-  fi
-}
+# ─── Run fzf ───────────────────────────────────────────────────
 
 SEL="$(
-  SHOW_HIDDEN=0
-  rm -f /tmp/tmx-show-hidden
-  printf '0' > /tmp/tmx-show-hidden
-  menu $SHOW_HIDDEN | fzf --height=90% --layout=reverse --border \
-             --prompt='tmux> ' --info=inline --ansi \
-             --expect=enter,ctrl-d \
-             --header='j/k: navigate | /: search | Enter: attach | Ctrl-d: attach+detach | Ctrl-h: hide | Ctrl-a: show hidden' \
-             --bind 'start:disable-search' \
-             --bind 'j:down,k:up,g:first,G:last,q:abort' \
-             --bind '/:unbind(j,k,g,G,q)+enable-search+clear-query+change-prompt(search> )' \
-             --bind 'esc:rebind(j,k,g,G,q)+disable-search+clear-query+change-prompt(tmux> )' \
-             --bind "ctrl-a:reload(
-               if [ -f /tmp/tmx-show-hidden ] && [ \"\$(cat /tmp/tmx-show-hidden)\" = \"1\" ]; then
-                 printf '0' > /tmp/tmx-show-hidden
-                 SESSIONS=\$(tmux list-sessions -F '#S' 2>/dev/null || true)
-                 printf '%s\n' '[+ ] Create new session'
-                 if [ -n \"\$SESSIONS\" ]; then
-                   hidden_sessions=\$([ -f '$HIDDEN_FILE' ] && cat '$HIDDEN_FILE' || true)
-                   while IFS= read -r session; do
-                     if ! printf '%s\n' \"\$hidden_sessions\" | grep -Fx \"\$session\" >/dev/null 2>&1; then
-                       printf '%s\n' \"\$session\"
-                     fi
-                   done <<EOF_INNER
-\$SESSIONS
-EOF_INNER
-                 fi
-               else
-                 printf '1' > /tmp/tmx-show-hidden
-                 SESSIONS=\$(tmux list-sessions -F '#S' 2>/dev/null || true)
-                 printf '%s\n' '[+ ] Create new session'
-                 if [ -n \"\$SESSIONS\" ]; then
-                   hidden_sessions=\$([ -f '$HIDDEN_FILE' ] && cat '$HIDDEN_FILE' || true)
-                   while IFS= read -r session; do
-                     if ! printf '%s\n' \"\$hidden_sessions\" | grep -Fx \"\$session\" >/dev/null 2>&1; then
-                       printf '%s\n' \"\$session\"
-                     fi
-                   done <<EOF_INNER
-\$SESSIONS
-EOF_INNER
-                   hidden_list=\"\"
-                   while IFS= read -r session; do
-                     if printf '%s\n' \"\$hidden_sessions\" | grep -Fx \"\$session\" >/dev/null 2>&1; then
-                       hidden_list=\"\${hidden_list}\${session}\"\$'\n'
-                     fi
-                   done <<EOF_INNER2
-\$SESSIONS
-EOF_INNER2
-                   if [ -n \"\$hidden_list\" ]; then
-                     printf '\033[1;90m━━━ Hidden (press ctrl-a to hide) ━━━\033[0m\n'
-                     printf '%s' \"\$hidden_list\" | sed 's/^/        /'
-                   fi
-                 fi
-               fi
-             )" \
-             --bind "ctrl-h:execute-silent(
-               session={}
-               # Skip action if it's a header line or create option
-               case \"\$session\" in
-                 *━━━*|'[+ ] Create new session') exit 0 ;;
-               esac
-               # Strip leading spaces from hidden session prefix
-               session=\$(printf '%s' \"\$session\" | sed 's/^[[:space:]]*//')
-               # Toggle hidden state
-               if grep -Fxq \"\$session\" '$HIDDEN_FILE' 2>/dev/null; then
-                 grep -Fxv \"\$session\" '$HIDDEN_FILE' > '${HIDDEN_FILE}.tmp' 2>/dev/null || true
-                 mv '${HIDDEN_FILE}.tmp' '$HIDDEN_FILE'
-               else
-                 printf '%s\n' \"\$session\" >> '$HIDDEN_FILE'
-               fi
-             )+reload(
-               show_hidden=0
-               [ -f /tmp/tmx-show-hidden ] && show_hidden=\$(cat /tmp/tmx-show-hidden)
-               SESSIONS=\$(tmux list-sessions -F '#S' 2>/dev/null || true)
-               printf '%s\n' '[+ ] Create new session'
-               if [ -n \"\$SESSIONS\" ]; then
-                 hidden_sessions=\$([ -f '$HIDDEN_FILE' ] && cat '$HIDDEN_FILE' || true)
-                 while IFS= read -r session; do
-                   if ! printf '%s\n' \"\$hidden_sessions\" | grep -Fx \"\$session\" >/dev/null 2>&1; then
-                     printf '%s\n' \"\$session\"
-                   fi
-                 done <<EOF_INNER
-\$SESSIONS
-EOF_INNER
-                 if [ \"\$show_hidden\" = \"1\" ]; then
-                   hidden_list=\"\"
-                   while IFS= read -r session; do
-                     if printf '%s\n' \"\$hidden_sessions\" | grep -Fx \"\$session\" >/dev/null 2>&1; then
-                       hidden_list=\"\${hidden_list}\${session}\"\$'\n'
-                     fi
-                   done <<EOF_INNER2
-\$SESSIONS
-EOF_INNER2
-                   if [ -n \"\$hidden_list\" ]; then
-                     printf '\033[1;90m━━━ Hidden (press ctrl-a to hide) ━━━\033[0m\n'
-                     printf '%s' \"\$hidden_list\" | sed 's/^/        /'
-                   fi
-                 fi
-               fi
-             )" \
-             --preview '
-               session={}
-               if [ "$session" = "'\''[+ ] Create new session'\''" ]; then
-                 printf "Create a new tmux session in: %s\n\n" "$PWD"
-                 printf "Press Enter to name it.\n"
-               elif printf "%s" "$session" | grep -q "━━━"; then
-                 printf "Section header\nPress ctrl-a to toggle hidden sessions\nPress ctrl-h on a session to hide/unhide it\n"
-               else
-                 # Show live preview of session windows and panes
-                 # Strip leading spaces from hidden session prefix
-                 session=$(printf "%s" "$session" | sed "s/^[[:space:]]*//")
-                 '"$TMUX_BIN"' list-windows -t "$session" -F "#{window_index}|#{window_name}|#{window_active}|#{window_panes}" 2>/dev/null | while IFS="|" read -r idx name active pane_count; do
-                   # Print window header
-                   if [ "$active" = "1" ]; then
-                     printf "\033[1;32m━━━ Window %s: %s (active) ━━━\033[0m\n" "$idx" "$name"
-                   else
-                     printf "\033[1;34m━━━ Window %s: %s ━━━\033[0m\n" "$idx" "$name"
-                   fi
-
-                   # Show panes for this window
-                   if [ "$pane_count" -eq 1 ]; then
-                     # Single pane - show full content (get first pane index dynamically)
-                     first_pane="$('"$TMUX_BIN"' list-panes -t "$session:$idx" -F "#{pane_index}" 2>/dev/null | head -1)"
-                     '"$TMUX_BIN"' capture-pane -ep -t "$session:$idx.$first_pane" -S 0 2>/dev/null || echo "  (no content)"
-                   else
-                     # Multiple panes - show them side by side or stacked
-                     '"$TMUX_BIN"' list-panes -t "$session:$idx" -F "#{pane_index}|#{pane_active}|#{pane_width}|#{pane_height}|#{pane_left}|#{pane_top}" 2>/dev/null | while IFS="|" read -r pidx pactive pw ph pl pt; do
-                       if [ "$pactive" = "1" ]; then
-                         printf "  \033[1;33m┌─ Pane %s (active) ─\033[0m\n" "$pidx"
-                       else
-                         printf "  \033[0;37m┌─ Pane %s ─\033[0m\n" "$pidx"
-                       fi
-                       # Show visible content (top 15 lines) of each pane
-                       '"$TMUX_BIN"' capture-pane -ep -t "$session:$idx.$pidx" -S 0 -E 15 2>/dev/null | sed "s/^/  │ /" || echo "  │ (no content)"
-                       printf "  └─────────────\n"
-                     done
-                   fi
-                   printf "\n"
-                 done || echo "No windows or session not found."
-               fi
-             ' \
-             --preview-window=right,75%,border-left,wrap || true
+  render_sessions 0 | fzf \
+    --height=90% --layout=reverse --border \
+    --prompt='tmux> ' --info=inline --ansi \
+    --expect=enter,ctrl-d \
+    --header='j/k: navigate | /: search | Enter: attach | Ctrl-d: attach+detach | r: rename | Ctrl-h: hide | Ctrl-x: kill | Ctrl-a: show hidden' \
+    --bind 'start:disable-search' \
+    --bind 'j:down,k:up,g:first,G:last,q:abort' \
+    --bind '/:unbind(j,k,g,G,q,r)+enable-search+clear-query+change-prompt(search> )' \
+    --bind 'esc:rebind(j,k,g,G,q,r)+disable-search+clear-query+change-prompt(tmux> )' \
+    --bind "r:execute($SCRIPT --internal-rename {})+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
+    --bind "ctrl-a:reload($SCRIPT --internal-toggle-display \"$SHOW_HIDDEN_FILE\")" \
+    --bind "ctrl-h:execute-silent($SCRIPT --internal-toggle-hidden {})+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
+    --bind "ctrl-x:execute($SCRIPT --internal-kill-session {})+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
+    --preview "$SCRIPT --internal-preview {}" \
+    --preview-window=right,75%,border-left,wrap || true
 )"
+
+# ─── Parse fzf result ──────────────────────────────────────────
 
 KEY="$(printf '%s' "${SEL}" | sed -n '1p')"
 CHOICE="$(printf '%s' "${SEL}" | sed -n '$p')"
 [ -z "${CHOICE}" ] && exit 0
 
-# Strip leading spaces from hidden session prefix
-CHOICE="$(printf '%s' "$CHOICE" | sed 's/^[[:space:]]*//')"
+# Strip leading spaces (from hidden-section indenting)
+CHOICE="$(clean_sel "$CHOICE")"
 
-# Skip if user selected a section header
+# Skip section headers
 case "${CHOICE}" in
   *━━━*) exit 0 ;;
 esac
 
-# Clean up temp file
-rm -f /tmp/tmx-show-hidden
+# ─── Route selection ───────────────────────────────────────────
 
-IN_TMUX=0
-[ "${TMUX-}" ] && IN_TMUX=1
-
-attach_normal() {
-  if [ "$IN_TMUX" -eq 1 ]; then
-    tmux switch-client -t "$1"
-  else
-    tmux attach-session -t "$1"
-  fi
-}
-
-attach_detach_others() {
-  if [ "$IN_TMUX" -eq 1 ]; then
-    tmux detach-client -a -s "$1" 2>/dev/null || true
-    tmux switch-client -t "$1"
-  else
-    tmux attach-session -d -t "$1"
-  fi
-}
-
-pick_directory() {
-  dirs="$(find "$HOME" -maxdepth 3 -type d \
-    -not -path '*/\.*' \
-    -not -path '*/node_modules/*' \
-    -not -path '*/__pycache__/*' \
-    2>/dev/null | sort)"
-  printf '%s\n' "$dirs" | \
-  fzf --height=90% --layout=reverse --border \
-      --prompt='dir> ' --info=inline \
-      --header="Enter: select directory | Esc: use current dir ($(pwd))" \
-      --preview 'ls -la --color=always {} 2>/dev/null || ls -la {}' \
-      --preview-window=right,50%,border-left || true
-}
-
-create_session() {
-  # prompt on the real TTY so it works after fzf
-  printf 'New session name: ' >/dev/tty
-  IFS= read -r name </dev/tty || name=
-  # trim spaces
-  name="$(printf '%s' "$name" | awk '{$1=$1;print}')"
-  [ -z "$name" ] && { printf 'Aborted: empty name.\n' >/dev/tty; exit 1; }
-
-  # pick a base directory, default to $PWD if skipped
-  dir="$(pick_directory)"
-  [ -z "$dir" ] && dir="$PWD"
-
-  # create detached so behaviour is identical inside/outside tmux
-  tmux new-session -ds "$name" -c "$dir"
-
-  # then attach/switch
-  if [ "$IN_TMUX" -eq 1 ]; then
-    tmux switch-client -t "$name"
-  else
-    tmux attach-session -t "$name"
-  fi
-}
-
-# route selection
 if [ "$CHOICE" = "[+ ] Create new session" ]; then
   create_session
   exit 0
