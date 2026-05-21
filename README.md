@@ -3,8 +3,8 @@
 Interactive tmux session manager via `fzf` with live preview.
 
 > **⚠️ Caveat emptor** — this is barely open source. It's the thing I use
-daily, polished to the point where others might enjoy it too. No roadmap, no
-support guarantees, but PRs are welcome.
+daily, fixed to the point where others might enjoy it too. No roadmap, no
+support, but can copy.
 
 ## Features
 
