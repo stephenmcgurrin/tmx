@@ -124,9 +124,10 @@ _render_panes() {
       || echo "  (no content)"
     # Process tree for single-pane
     _pid="$("$TMUX_BIN" list-panes -t "$1:$2.$_first" -F '#{pane_pid}' 2>/dev/null)"
-    if [ -n "$_pid" ] && command -v ps >/dev/null 2>&1; then
-      ps -o pid=,comm= --ppid "$_pid" 2>/dev/null | head -5 | while IFS= read -r _pline; do
-        printf '  %s\n' "$(printf '%s' "$_pline" | awk '{$1=$1;print}')"
+    if [ -n "$_pid" ]; then
+      { pgrep -P "$_pid" 2>/dev/null || ps -o pid=,comm= --ppid "$_pid" 2>/dev/null; } | head -5 | while IFS= read -r _child; do
+        _cname="$(ps -o comm= -p "$_child" 2>/dev/null || echo '?')"
+        printf '  │ %s %s\n' "$_child" "$(printf '%s' "$_cname" | awk '{$1=$1;print}')"
       done
     fi
   else
@@ -141,9 +142,10 @@ _render_panes() {
         | sed 's/^/  │ /' || echo '  │ (no content)'
       # Process tree
       _pid="$("$TMUX_BIN" list-panes -t "$1:$2.$_pi" -F '#{pane_pid}' 2>/dev/null)"
-      if [ -n "$_pid" ] && command -v ps >/dev/null 2>&1; then
-        ps -o pid=,comm= --ppid "$_pid" 2>/dev/null | head -5 | while IFS= read -r _pline; do
-          printf '  │ %s\n' "$(printf '%s' "$_pline" | awk '{$1=$1;print}')"
+      if [ -n "$_pid" ]; then
+        { pgrep -P "$_pid" 2>/dev/null || ps -o pid=,comm= --ppid "$_pid" 2>/dev/null; } | head -5 | while IFS= read -r _child; do
+          _cname="$(ps -o comm= -p "$_child" 2>/dev/null || echo '?')"
+          printf '  │ %s %s\n' "$_child" "$(printf '%s' "$_cname" | awk '{$1=$1;print}')"
         done
       fi
         printf '  └─────────────\n'
