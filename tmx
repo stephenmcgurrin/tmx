@@ -466,20 +466,7 @@ case "${1:-}" in
       else
         printf '\033[38;2;203;166;247m━━━ Window %s: %s ━━━\033[0m\n' "$_idx" "$_wname"
       fi
-      if [ "$_wpanes" -eq 1 ]; then
-        _first="$("$TMUX_BIN" list-panes -t "$_s:$_idx" -F '#{pane_index}' 2>/dev/null | head -1)"
-        "$TMUX_BIN" capture-pane -ep -t "$_s:$_idx.$_first" -S 0 2>/dev/null || echo "  (no content)"
-      else
-        "$TMUX_BIN" list-panes -t "$_s:$_idx" -F '#{pane_index}|#{pane_active}' 2>/dev/null | while IFS='|' read -r _pi _pa; do
-          if [ "$_pa" = "1" ]; then
-            printf '  \033[38;2;250;179;135m┌─ Pane %s (active) ─\033[0m\n' "$_pi"
-          else
-            printf '  \033[38;2;88;91;112m┌─ Pane %s ─\033[0m\n' "$_pi"
-          fi
-          "$TMUX_BIN" capture-pane -ep -t "$_s:$_idx.$_pi" -S 0 -E 15 2>/dev/null | sed 's/^/  │ /' || echo '  │ (no content)'
-          printf '  └─────────────\n'
-        done
-      fi
+      _render_panes "$_s" "$_idx" "$_wpanes"
     done
     exit 0
     ;;
