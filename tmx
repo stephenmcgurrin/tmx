@@ -93,11 +93,14 @@ EOF
         _act="$(( _diff / 86400 ))d"
       fi
       if [ -n "${TMUX-}" ] && [ "$s" = "$("$TMUX_BIN" display-message -p '#S' 2>/dev/null)" ]; then
-        printf '\033[38;2;166;227;161m● %s  \033[0m\033[38;2;166;173;200m%sw %sc  %s\033[0m\n' "$s" "$_w" "$_c" "$_act"
+        printf '%s● %s  \033[0m%s%sw %sc  %s\033[0m
+' "$TMX_COLOR_CURRENT" "$s" "$TMX_COLOR_META" "$_w" "$_c" "$_act"
       elif [ "$_c" -gt 0 ] 2>/dev/null; then
-        printf '\033[38;2;249;226;175m◎ %s  \033[0m\033[38;2;166;173;200m%sw %sc  %s\033[0m\n' "$s" "$_w" "$_c" "$_act"
+        printf '%s◎ %s  \033[0m%s%sw %sc  %s\033[0m
+' "$TMX_COLOR_ATTACHED" "$s" "$TMX_COLOR_META" "$_w" "$_c" "$_act"
       else
-        printf '%s  \033[38;2;166;173;200m%sw %sc  %s\033[0m\n' "$s" "$_w" "$_c" "$_act"
+        printf '%s  %s%sw %sc  %s\033[0m
+' "$s" "$TMX_COLOR_META" "$_w" "$_c" "$_act"
       fi
     fi
   done <<EOF
@@ -328,6 +331,12 @@ create_session() {
 # ─── Internal dispatch (called by fzf reload / execute binds) ──
 # These run BEFORE set -eu so reloads never hit spurious failures.
 
+# Color defaults (must be above dispatch so handlers can use them)
+_esc=$(printf '\033')
+TMX_COLOR_CURRENT="${TMX_COLOR_CURRENT:-${_esc}[38;2;166;227;161m}"
+TMX_COLOR_ATTACHED="${TMX_COLOR_ATTACHED:-${_esc}[38;2;249;226;175m}"
+TMX_COLOR_META="${TMX_COLOR_META:-${_esc}[38;2;166;173;200m}"
+
 case "${1:-}" in
 
   --help|-h)
@@ -344,6 +353,9 @@ case "${1:-}" in
     printf '%s\n' "  TMX_SORT_ORDER=alpha        alpha|recent"
     printf '%s\n' "  TMX_PREVIEW_WINDOW='right,75%,border-left,wrap'"
     printf '%s\n' "  TMX_NERD_FONTS=0            force ASCII glyphs"
+    printf '%s\n' "  TMX_COLOR_CURRENT=\\033[38;2;166;227;161m  current session color"
+    printf '%s\n' "  TMX_COLOR_ATTACHED=\\033[38;2;249;226;175m  attached session color"
+    printf '%s\n' "  TMX_COLOR_META=\\033[38;2;166;173;200m      metadata color"
     exit 0
     ;;
 
@@ -539,6 +551,9 @@ TMX_EXCLUDE_PATHS="${TMX_EXCLUDE_PATHS:-node_modules|__pycache__|.git|target|dis
 TMX_SORT_ORDER="${TMX_SORT_ORDER:-alpha}"
 TMX_PREVIEW_WINDOW="${TMX_PREVIEW_WINDOW:-right,75%,border-left,wrap}"
 TMX_RECENT_DIRS_MAX="${TMX_RECENT_DIRS_MAX:-50}"
+TMX_COLOR_CURRENT="${TMX_COLOR_CURRENT:-${_esc}[38;2;166;227;161m}"
+TMX_COLOR_ATTACHED="${TMX_COLOR_ATTACHED:-${_esc}[38;2;249;226;175m}"
+TMX_COLOR_META="${TMX_COLOR_META:-${_esc}[38;2;166;173;200m}"
 [ -f "${HOME}/.tmxrc" ] && . "${HOME}/.tmxrc"
 
 need() {
