@@ -62,18 +62,18 @@ render_sessions() {
   hidden_sessions="$(load_hidden_sessions)"
 
   # ---- active (non-hidden) sessions ----
-  sessions="$(printf '%s\n' "$sessions" | LC_ALL=C sort)"  # default alpha sort
-  case "${TMX_SORT_ORDER}" in
+  sessions="$(printf '%s\n' "$sessions" | LC_ALL=C sort -f)"
+  case "${TMX_SORT_ORDER:-}" in
     recent)
       _sorted=""
       while IFS= read -r _sr; do
         [ -z "$_sr" ] && continue
         _act="$("$TMUX_BIN" display-message -t "$_sr" -p '#{session_activity}' 2>/dev/null || echo 0)"
-        printf '%s %s\n' "$_act" "$_sr"
+        _sorted="${_sorted}${_act} ${_sr}\n"
       done <<EOF
 $sessions
 EOF
-      sessions="$(LC_ALL=C sort -k1,1nr | cut -d' ' -f2-)"
+      sessions="$(printf '%b' "$_sorted" | LC_ALL=C sort -k1,1nr | cut -d' ' -f2-)"
       ;;
   esac
   while IFS= read -r s; do
@@ -500,7 +500,7 @@ SEL="$(
     --bind "ctrl-h:execute-silent($SCRIPT --internal-toggle-hidden {})+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
     --bind "ctrl-x:execute($SCRIPT --internal-kill-session {})+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
     --bind "ctrl-e:execute($SCRIPT --internal-set-description {})+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
-    --bind "ctrl-w:reload($SCRIPT --internal-list-windows {})" \
+    --bind "ctrl-w:reload($SCRIPT --internal-list-windows {})+bind(esc:reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\"))" \
     --preview "$SCRIPT --internal-preview {}" \
     --preview-window="${TMX_PREVIEW_WINDOW:-right,75%,border-left,wrap}" || true
 )"
