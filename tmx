@@ -93,14 +93,11 @@ EOF
         _act="$(( _diff / 86400 ))d"
       fi
       if [ -n "${TMUX-}" ] && [ "$s" = "$("$TMUX_BIN" display-message -p '#S' 2>/dev/null)" ]; then
-        printf '%s● %s  \033[0m%s%sw %sc  %s\033[0m
-' "$TMX_COLOR_CURRENT" "$s" "$TMX_COLOR_META" "$_w" "$_c" "$_act"
+        printf '%s● %s  \033[0m%s%sw\033[0m %s%sc\033[0m %s%s\033[0m\n' "$TMX_COLOR_CURRENT" "$s" "$TMX_COLOR_WINDOWS" "$_w" "$TMX_COLOR_CLIENTS" "$_c" "$TMX_COLOR_ACTIVITY" "$_act"
       elif [ "$_c" -gt 0 ] 2>/dev/null; then
-        printf '%s◎ %s  \033[0m%s%sw %sc  %s\033[0m
-' "$TMX_COLOR_ATTACHED" "$s" "$TMX_COLOR_META" "$_w" "$_c" "$_act"
+        printf '%s◎ %s  \033[0m%s%sw\033[0m %s%sc\033[0m %s%s\033[0m\n' "$TMX_COLOR_ATTACHED" "$s" "$TMX_COLOR_WINDOWS" "$_w" "$TMX_COLOR_CLIENTS" "$_c" "$TMX_COLOR_ACTIVITY" "$_act"
       else
-        printf '%s  %s%sw %sc  %s\033[0m
-' "$s" "$TMX_COLOR_META" "$_w" "$_c" "$_act"
+        printf '%s  %s%sw\033[0m %s%sc\033[0m %s%s\033[0m\n' "$s" "$TMX_COLOR_WINDOWS" "$_w" "$TMX_COLOR_CLIENTS" "$_c" "$TMX_COLOR_ACTIVITY" "$_act"
       fi
     fi
   done <<EOF
@@ -335,7 +332,9 @@ create_session() {
 _esc=$(printf '\033')
 TMX_COLOR_CURRENT="${TMX_COLOR_CURRENT:-${_esc}[38;2;166;227;161m}"
 TMX_COLOR_ATTACHED="${TMX_COLOR_ATTACHED:-${_esc}[38;2;249;226;175m}"
-TMX_COLOR_META="${TMX_COLOR_META:-${_esc}[38;2;166;173;200m}"
+TMX_COLOR_WINDOWS="${TMX_COLOR_WINDOWS:-${_esc}[38;2;148;226;213m}"
+TMX_COLOR_CLIENTS="${TMX_COLOR_CLIENTS:-${_esc}[38;2;250;179;135m}"
+TMX_COLOR_ACTIVITY="${TMX_COLOR_ACTIVITY:-${_esc}[38;2;166;173;200m}"
 
 case "${1:-}" in
 
@@ -353,9 +352,11 @@ case "${1:-}" in
     printf '%s\n' "  TMX_SORT_ORDER=alpha        alpha|recent"
     printf '%s\n' "  TMX_PREVIEW_WINDOW='right,75%,border-left,wrap'"
     printf '%s\n' "  TMX_NERD_FONTS=0            force ASCII glyphs"
-    printf '%s\n' "  TMX_COLOR_CURRENT=\\033[38;2;166;227;161m  current session color"
-    printf '%s\n' "  TMX_COLOR_ATTACHED=\\033[38;2;249;226;175m  attached session color"
-    printf '%s\n' "  TMX_COLOR_META=\\033[38;2;166;173;200m      metadata color"
+    printf '%s\n' "  TMX_COLOR_CURRENT=\033[38;2;166;227;161m  current session"
+    printf '%s\n' "  TMX_COLOR_ATTACHED=\033[38;2;249;226;175m  attached session"
+    printf '%s\n' "  TMX_COLOR_WINDOWS=\033[38;2;148;226;213m  window count"
+    printf '%s\n' "  TMX_COLOR_CLIENTS=\033[38;2;250;179;135m  client count"
+    printf '%s\n' "  TMX_COLOR_ACTIVITY=\033[38;2;166;173;200m  activity time"
     exit 0
     ;;
 
@@ -553,7 +554,9 @@ TMX_PREVIEW_WINDOW="${TMX_PREVIEW_WINDOW:-right,75%,border-left,wrap}"
 TMX_RECENT_DIRS_MAX="${TMX_RECENT_DIRS_MAX:-50}"
 TMX_COLOR_CURRENT="${TMX_COLOR_CURRENT:-${_esc}[38;2;166;227;161m}"
 TMX_COLOR_ATTACHED="${TMX_COLOR_ATTACHED:-${_esc}[38;2;249;226;175m}"
-TMX_COLOR_META="${TMX_COLOR_META:-${_esc}[38;2;166;173;200m}"
+TMX_COLOR_WINDOWS="${TMX_COLOR_WINDOWS:-${_esc}[38;2;148;226;213m}"
+TMX_COLOR_CLIENTS="${TMX_COLOR_CLIENTS:-${_esc}[38;2;250;179;135m}"
+TMX_COLOR_ACTIVITY="${TMX_COLOR_ACTIVITY:-${_esc}[38;2;166;173;200m}"
 [ -f "${HOME}/.tmxrc" ] && . "${HOME}/.tmxrc"
 
 need() {
