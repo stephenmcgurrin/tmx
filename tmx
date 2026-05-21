@@ -422,13 +422,47 @@ case "${1:-}" in
     _s="$(clean_sel "$2")"
     skip_header "$_s" || exit 0
     # Mark that we're in window view so Esc can return to sessions
-    printf 1 > "${SHOW_HIDDEN_FILE}.win"
+    printf 1 > "${TMX_STATE_FILE}.win"
+    # Store session name for preview handler
+    printf '%s' "$_s" > "${TMX_STATE_FILE}.winsession"
     printf '← Back to sessions (Esc)\n'
     "$TMUX_BIN" list-windows -t "$_s" -F '#{window_index}|#{window_name}|#{window_active}' 2>/dev/null | while IFS='|' read -r _idx _wname _wact; do
       if [ "$_wact" = "1" ]; then
         printf '\033[38;2;166;227;161m● %s: %s (active)\033[0m\n' "$_idx" "$_wname"
       else
         printf '  %s: %s\n' "$_idx" "$_wname"
+      fi
+    done
+    exit 0
+    ;;
+
+  # usage:  tmx --internal-preview-window <window-line>
+  --internal-preview-window)
+    _s="$(cat "${TMX_STATE_FILE}.winsession" 2>/dev/null || echo '')"
+    [ -z "$_s" ] && exit 0
+    _win="$(printf '%s' "$2" | sed 's/^[● ]*//; s/:.*//')"
+    [ -z "$_win" ] && exit 0
+    # Show single window preview — reuse preview_session logic scoped to one window
+    "$TMUX_BIN" list-windows -t "$_s" -F "#{window_index}|#{window_name}|#{window_active}|#{window_panes}" 2>/dev/null | while IFS='|' read -r _idx _wname _wact _wpanes; do
+      [ "$_idx" = "$_win" ] || continue
+      if [ "$_wact" = "1" ]; then
+        printf '\033[38;2;166;227;161m━━━ Window %s: %s (active) ━━━\033[0m\n' "$_idx" "$_wname"
+      else
+        printf '\033[38;2;203;166;247m━━━ Window %s: %s ━━━\033[0m\n' "$_idx" "$_wname"
+      fi
+      if [ "$_wpanes" -eq 1 ]; then
+        _first="$("$TMUX_BIN" list-panes -t "$_s:$_idx" -F '#{pane_index}' 2>/dev/null | head -1)"
+        "$TMUX_BIN" capture-pane -ep -t "$_s:$_idx.$_first" -S 0 2>/dev/null || echo "  (no content)"
+      else
+        "$TMUX_BIN" list-panes -t "$_s:$_idx" -F '#{pane_index}|#{pane_active}' 2>/dev/null | while IFS='|' read -r _pi _pa; do
+          if [ "$_pa" = "1" ]; then
+            printf '  \033[38;2;250;179;135m┌─ Pane %s (active) ─\033[0m\n' "$_pi"
+          else
+            printf '  \033[38;2;88;91;112m┌─ Pane %s ─\033[0m\n' "$_pi"
+          fi
+          "$TMUX_BIN" capture-pane -ep -t "$_s:$_idx.$_pi" -S 0 -E 15 2>/dev/null | sed 's/^/  │ /' || echo '  │ (no content)'
+          printf '  └─────────────\n'
+        done
       fi
     done
     exit 0
@@ -482,7 +516,9 @@ need fzf
 
 # Secure temp file for the show-hidden toggle (no predictable /tmp path)
 SHOW_HIDDEN_FILE="$(mktemp)"
-trap 'rm -f "$SHOW_HIDDEN_FILE"' EXIT
+TMX_STATE_FILE="$SHOW_HIDDEN_FILE"
+export TMX_STATE_FILE
+trap 'rm -f "$SHOW_HIDDEN_FILE" "${SHOW_HIDDEN_FILE}.win"' EXIT
 printf '0' > "$SHOW_HIDDEN_FILE"
 
 # ─── Run fzf ───────────────────────────────────────────────────
@@ -502,7 +538,7 @@ SEL="$(
     --bind "ctrl-h:execute-silent($SCRIPT --internal-toggle-hidden {})+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
     --bind "ctrl-x:execute($SCRIPT --internal-kill-session {})+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
     --bind "ctrl-e:execute($SCRIPT --internal-set-description {})+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
-    --bind "ctrl-w:reload($SCRIPT --internal-list-windows {})" \
+    --bind "ctrl-w:reload($SCRIPT --internal-list-windows {})+change-preview($SCRIPT --internal-preview-window {})" \
     --preview "$SCRIPT --internal-preview {}" \
     --preview-window="${TMX_PREVIEW_WINDOW:-right,75%,border-left,wrap}" || true
 )"
