@@ -54,7 +54,7 @@ toggle_hidden() {
 # $1 = 0|1  (whether to show the "Hidden" section)
 render_sessions() {
   show_hidden="${1:-0}"
-  printf '%s\n' "[+ ] Create new session"
+  printf '\033[38;2;137;220;235m[+ ] Create new session\033[0m\n'
 
   sessions="$("$TMUX_BIN" list-sessions -F '#S' 2>/dev/null || true)"
   [ -z "$sessions" ] && return 0
@@ -80,11 +80,14 @@ EOF
     [ -z "$s" ] && continue
     if ! printf '%s\n' "$hidden_sessions" | grep -Fx "$s" >/dev/null 2>&1; then
       _w="$("$TMUX_BIN" list-windows -t "$s" 2>/dev/null | wc -l | tr -d ' ')"
-      _a="$("$TMUX_BIN" display-message -t "$s" -p '#{session_activity_string}' 2>/dev/null || echo '')"
+      _c="$("$TMUX_BIN" list-clients -F '#{client_session}' 2>/dev/null | grep -Fxc "$s" | tr -d '\n' || echo 0)"
+      _act="$("$TMUX_BIN" display-message -t "$s" -p '#{session_activity_string}' 2>/dev/null || echo '')"
       if [ -n "${TMUX-}" ] && [ "$s" = "$("$TMUX_BIN" display-message -p '#S' 2>/dev/null)" ]; then
-        printf '\033[38;2;166;227;161m● %s  \033[0m\033[38;2;166;173;200m%sw  %s\033[0m\n' "$s" "$_w" "$_a"
+        printf '\033[38;2;166;227;161m● %s  \033[0m\033[38;2;166;173;200m%sw %sc  %s\033[0m\n' "$s" "$_w" "$_c" "$_act"
+      elif [ "$_c" -gt 0 ] 2>/dev/null; then
+        printf '\033[38;2;249;226;175m◎ %s  \033[0m\033[38;2;166;173;200m%sw %sc  %s\033[0m\n' "$s" "$_w" "$_c" "$_act"
       else
-        printf '%s  \033[38;2;166;173;200m%sw  %s\033[0m\n' "$s" "$_w" "$_a"
+        printf '%s  \033[38;2;166;173;200m%sw %sc  %s\033[0m\n' "$s" "$_w" "$_c" "$_act"
       fi
     fi
   done <<EOF
