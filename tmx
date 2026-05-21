@@ -434,13 +434,8 @@ case "${1:-}" in
     exit 0
     ;;
 
-  # usage:  tmx --internal-preview <session-name-or-window-line>
+  # usage:  tmx --internal-preview <session-name>
   --internal-preview)
-    # If we're in window view, delegate to window preview
-    if [ -f "${TMX_STATE_FILE}.win" ]; then
-      "$TMUX_BIN" list-sessions >/dev/null 2>&1 || exit 0
-      exec "$SCRIPT" --internal-preview-window "${2:-}"
-    fi
     preview_session "${2:-}"
     exit 0
     ;;
