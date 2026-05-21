@@ -421,6 +421,8 @@ case "${1:-}" in
   --internal-list-windows)
     _s="$(clean_sel "$2")"
     skip_header "$_s" || exit 0
+    # Mark that we're in window view so Esc can return to sessions
+    printf 1 > "${SHOW_HIDDEN_FILE}.win"
     printf '← Back to sessions (Esc)\n'
     "$TMUX_BIN" list-windows -t "$_s" -F '#{window_index}|#{window_name}|#{window_active}' 2>/dev/null | while IFS='|' read -r _idx _wname _wact; do
       if [ "$_wact" = "1" ]; then
@@ -500,7 +502,7 @@ SEL="$(
     --bind "ctrl-h:execute-silent($SCRIPT --internal-toggle-hidden {})+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
     --bind "ctrl-x:execute($SCRIPT --internal-kill-session {})+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
     --bind "ctrl-e:execute($SCRIPT --internal-set-description {})+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
-    --bind "ctrl-w:reload($SCRIPT --internal-list-windows {})+bind(esc:reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\"))" \
+    --bind "ctrl-w:reload($SCRIPT --internal-list-windows {})" \
     --preview "$SCRIPT --internal-preview {}" \
     --preview-window="${TMX_PREVIEW_WINDOW:-right,75%,border-left,wrap}" || true
 )"
@@ -517,6 +519,14 @@ CHOICE="$(clean_sel "$CHOICE")"
 # Skip section headers and leftovers (fzf may emit noise on exit)
 case "${CHOICE}" in
   *━━━*|[eE][xX][iI][tT][eE][dD]*) exit 0 ;;
+  '')
+    # Esc pressed while in window view — re-run with session list
+    if [ -f "${SHOW_HIDDEN_FILE}.win" ]; then
+      rm -f "${SHOW_HIDDEN_FILE}.win"
+      exec "$SCRIPT"
+    fi
+    exit 0
+    ;;
 esac
 
 # ─── Route selection ───────────────────────────────────────────
@@ -524,14 +534,11 @@ esac
 # Window jumping: selection looks like "1: main (active)"
 case "$CHOICE" in
   ←*)
-    # Back to sessions reload — exit and let the bind reload handle it
-    exit 0
+    # Esc pressed on Back header — re-run sessions
+    exec "$SCRIPT"
     ;;
   [0-9]*:*)
     _win="$(printf '%s' "$CHOICE" | sed 's/[: ].*//')"
-    # Need to figure out the session from the last selected (stored?)
-    # For now: just attach to whatever tmux session this window belongs to
-    # Simpler: the window line has the window index; grab session from tmux
     _parent="$("$TMUX_BIN" list-windows -F '#{session_name}|#{window_index}' 2>/dev/null | grep "|$_win$" | cut -d'|' -f1 | head -1)"
     [ -n "$_parent" ] && attach_normal "$_parent:$_win"
     exit 0
