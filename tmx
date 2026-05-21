@@ -21,7 +21,7 @@ esac
 clean_sel() { printf '%s' "$1" | sed 's/\x1b\[[0-9;]*m//g; s/^[[:space:]]*//; s/[[:space:]]*[0-9]*w.*$//; s/^[●*] //; s/^ *//'; }
 
 skip_header() {
-  case "$1" in *━━━*|'[+ ] Create new session'|'') return 1 ;; esac
+  case "$1" in *━━━*|'') return 1 ;; esac
   return 0
 }
 
@@ -54,7 +54,6 @@ toggle_hidden() {
 # $1 = 0|1  (whether to show the "Hidden" section)
 render_sessions() {
   show_hidden="${1:-0}"
-  printf '\033[38;2;137;220;235m[+ ] Create new session\033[0m\n'
 
   sessions="$("$TMUX_BIN" list-sessions -F '#S' 2>/dev/null || true)"
   [ -z "$sessions" ] && return 0
@@ -142,11 +141,6 @@ _render_panes() {
 preview_session() {
   s="$1"
   case "$s" in
-    '[+ ] Create new session')
-      printf "Create a new tmux session\n\n"
-      printf "Directory: %s\n\n" "$PWD"
-      printf "Press Enter to name it.\n"
-      ;;
     *━━━*)
       printf "Hidden sessions — ctrl-a to hide, ctrl-h to hide/unhide, r to rename, ctrl-x to kill\n"
       ;;
@@ -410,6 +404,39 @@ case "${1:-}" in
     exit 0
     ;;
 
+  # usage:  tmx --internal-new-session
+  --internal-new-session)
+    # Run create_session inline (prompts for name, picks dir, attaches)
+    create_session
+    exit 0
+    ;;
+
+  # usage:  tmx --internal-help
+  --internal-help)
+    printf 1 > "${TMX_STATE_FILE}.help"
+    cat <<'HELP'
+\033[38;2;137;220;235m━━━ Keybindings ━━━\033[0m
+
+\033[38;2;166;227;161mj / k\033[0m          Move down / up
+\033[38;2;166;227;161mg / G\033[0m          Jump to top / bottom
+\033[38;2;166;227;161m/\033[0m              Search
+\033[38;2;166;227;161mEsc\033[0m            Close this help / exit search
+\033[38;2;166;227;161m?\033[0m              Toggle this help
+\033[38;2;166;227;161mq\033[0m              Quit
+
+\033[38;2;166;227;161mEnter\033[0m          Attach to session
+\033[38;2;166;227;161mCtrl-n\033[0m         Create new session
+\033[38;2;166;227;161mCtrl-d\033[0m         Attach & detach others
+\033[38;2;166;227;161mCtrl-w\033[0m         Window view (Esc to return)
+\033[38;2;166;227;161mr\033[0m              Rename session
+\033[38;2;166;227;161mCtrl-h\033[0m         Toggle hide/unhide
+\033[38;2;166;227;161mCtrl-a\033[0m         Toggle hidden sessions
+\033[38;2;166;227;161mCtrl-x\033[0m         Kill session
+\033[38;2;166;227;161mCtrl-e\033[0m         Edit description
+HELP
+    exit 0
+    ;;
+
   # usage:  tmx --internal-set-description <session-name>
   --internal-set-description)
     session="$(clean_sel "$2")"
@@ -521,7 +548,7 @@ need fzf
 SHOW_HIDDEN_FILE="$(mktemp)"
 TMX_STATE_FILE="$SHOW_HIDDEN_FILE"
 export TMX_STATE_FILE
-trap 'rm -f "$SHOW_HIDDEN_FILE" "${SHOW_HIDDEN_FILE}.win"' EXIT
+trap 'rm -f "$SHOW_HIDDEN_FILE" "${SHOW_HIDDEN_FILE}.win" "${SHOW_HIDDEN_FILE}.help"' EXIT
 printf '0' > "$SHOW_HIDDEN_FILE"
 
 # ─── Run fzf ───────────────────────────────────────────────────
@@ -530,13 +557,15 @@ SEL="$(
   render_sessions 0 | fzf \
     --height=90% --layout=reverse --border \
     --prompt='tmux> ' --info=inline --ansi \
-    --expect=enter,ctrl-d \
-    --header='j/k:nav  /:search  Enter:attach  Ctrl-d:detach  r:rename  Ctrl-x:kill  Ctrl-a:hidden  q:quit' \
+    --expect=enter,ctrl-d,ctrl-n \
+    --header='' \
     --bind 'start:disable-search' \
     --bind 'j:down,k:up,g:first,G:last,q:abort' \
     --bind '/:unbind(j,k,g,G,q,r)+enable-search+clear-query+change-prompt(search> )' \
     --bind 'esc:rebind(j,k,g,G,q,r)+disable-search+clear-query+change-prompt(tmux> )' \
     --bind "r:execute($SCRIPT --internal-rename {})+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
+    --bind "ctrl-n:execute($SCRIPT --internal-new-session)+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
+    --bind "?:reload($SCRIPT --internal-help)" \
     --bind "ctrl-a:reload($SCRIPT --internal-toggle-display \"$SHOW_HIDDEN_FILE\")" \
     --bind "ctrl-h:execute-silent($SCRIPT --internal-toggle-hidden {})+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
     --bind "ctrl-x:execute($SCRIPT --internal-kill-session {})+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
@@ -557,11 +586,11 @@ CHOICE="$(clean_sel "$CHOICE")"
 
 # Skip section headers and leftovers (fzf may emit noise on exit)
 case "${CHOICE}" in
-  *━━━*|[eE][xX][iI][tT][eE][dD]*) exit 0 ;;
+  *━━━*|[eE][xX][iI][tT][eE][dD]*|*'Keybindings'*) exit 0 ;;
   '')
-    # Esc pressed while in window view — re-run with session list
-    if [ -f "${SHOW_HIDDEN_FILE}.win" ]; then
-      rm -f "${SHOW_HIDDEN_FILE}.win"
+    # Esc pressed while in window view or help — re-run with session list
+    if [ -f "${SHOW_HIDDEN_FILE}.win" ] || [ -f "${SHOW_HIDDEN_FILE}.help" ]; then
+      rm -f "${SHOW_HIDDEN_FILE}.win" "${SHOW_HIDDEN_FILE}.help"
       exec "$SCRIPT"
     fi
     exit 0
@@ -584,12 +613,8 @@ case "$CHOICE" in
     ;;
 esac
 
-if [ "$CHOICE" = "[+ ] Create new session" ]; then
-  create_session
-  exit 0
-else
-  case "$KEY" in
-    ctrl-d) attach_detach_others "$CHOICE" ;;
-    ""|enter|*) attach_normal "$CHOICE" ;;
-  esac
-fi
+case "$KEY" in
+  ctrl-d) attach_detach_others "$CHOICE" ;;
+  ctrl-n) create_session ;;
+  ""|enter|*) attach_normal "$CHOICE" ;;
+esac
