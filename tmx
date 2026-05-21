@@ -413,7 +413,6 @@ case "${1:-}" in
 
   # usage:  tmx --internal-help
   --internal-help)
-    printf 1 > "${TMX_STATE_FILE}.help"
     cat <<'HELP'
 \033[38;2;137;220;235m━━━ Keybindings ━━━\033[0m
 
@@ -548,7 +547,7 @@ need fzf
 SHOW_HIDDEN_FILE="$(mktemp)"
 TMX_STATE_FILE="$SHOW_HIDDEN_FILE"
 export TMX_STATE_FILE
-trap 'rm -f "$SHOW_HIDDEN_FILE" "${SHOW_HIDDEN_FILE}.win" "${SHOW_HIDDEN_FILE}.help"' EXIT
+trap 'rm -f "$SHOW_HIDDEN_FILE" "${SHOW_HIDDEN_FILE}.win"' EXIT
 printf '0' > "$SHOW_HIDDEN_FILE"
 
 # ─── Run fzf ───────────────────────────────────────────────────
@@ -565,7 +564,7 @@ SEL="$(
     --bind 'esc:rebind(j,k,g,G,q,r)+disable-search+clear-query+change-prompt(tmux> )' \
     --bind "r:execute($SCRIPT --internal-rename {})+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
     --bind "ctrl-n:execute($SCRIPT --internal-new-session)+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
-    --bind "?:reload($SCRIPT --internal-help)" \
+    --bind "?:execute-silent(if [ -f \"$SHOW_HIDDEN_FILE.help\" ]; then rm -f \"$SHOW_HIDDEN_FILE.help\"; else printf 1 > \"$SHOW_HIDDEN_FILE.help\"; fi)+change-preview(if [ -f \"$SHOW_HIDDEN_FILE.help\" ]; then $SCRIPT --internal-help; else $SCRIPT --internal-preview {}; fi)" \
     --bind "ctrl-a:reload($SCRIPT --internal-toggle-display \"$SHOW_HIDDEN_FILE\")" \
     --bind "ctrl-h:execute-silent($SCRIPT --internal-toggle-hidden {})+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
     --bind "ctrl-x:execute($SCRIPT --internal-kill-session {})+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
@@ -586,11 +585,11 @@ CHOICE="$(clean_sel "$CHOICE")"
 
 # Skip section headers and leftovers (fzf may emit noise on exit)
 case "${CHOICE}" in
-  *━━━*|[eE][xX][iI][tT][eE][dD]*|*'Keybindings'*) exit 0 ;;
+  *━━━*|[eE][xX][iI][tT][eE][dD]*) exit 0 ;;
   '')
-    # Esc pressed while in window view or help — re-run with session list
-    if [ -f "${SHOW_HIDDEN_FILE}.win" ] || [ -f "${SHOW_HIDDEN_FILE}.help" ]; then
-      rm -f "${SHOW_HIDDEN_FILE}.win" "${SHOW_HIDDEN_FILE}.help"
+    # Esc pressed while in window view — re-run with session list
+    if [ -f "${SHOW_HIDDEN_FILE}.win" ]; then
+      rm -f "${SHOW_HIDDEN_FILE}.win"
       exec "$SCRIPT"
     fi
     exit 0
