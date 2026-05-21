@@ -80,7 +80,18 @@ EOF
     if ! printf '%s\n' "$hidden_sessions" | grep -Fx "$s" >/dev/null 2>&1; then
       _w="$("$TMUX_BIN" list-windows -t "$s" 2>/dev/null | wc -l | tr -d ' ')"
       _c="$("$TMUX_BIN" list-clients -F '#{client_session}' 2>/dev/null | grep -Fxc "$s" | tr -d '\n' || echo 0)"
-      _act="$("$TMUX_BIN" display-message -t "$s" -p '#{session_activity_string}' 2>/dev/null || echo '')"
+      _act="$("$TMUX_BIN" display-message -t "$s" -p '#{session_activity}' 2>/dev/null || echo 0)"
+      _now="$(date +%s)"
+      _diff=$(( _now - _act ))
+      if [ "$_diff" -lt 60 ]; then
+        _act="${_diff}s"
+      elif [ "$_diff" -lt 3600 ]; then
+        _act="$(( _diff / 60 ))m"
+      elif [ "$_diff" -lt 86400 ]; then
+        _act="$(( _diff / 3600 ))h"
+      else
+        _act="$(( _diff / 86400 ))d"
+      fi
       if [ -n "${TMUX-}" ] && [ "$s" = "$("$TMUX_BIN" display-message -p '#S' 2>/dev/null)" ]; then
         printf '\033[38;2;166;227;161m● %s  \033[0m\033[38;2;166;173;200m%sw %sc  %s\033[0m\n' "$s" "$_w" "$_c" "$_act"
       elif [ "$_c" -gt 0 ] 2>/dev/null; then
