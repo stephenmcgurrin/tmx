@@ -413,26 +413,22 @@ case "${1:-}" in
 
   # usage:  tmx --internal-help
   --internal-help)
-    cat <<'HELP'
-\033[38;2;137;220;235m━━━ Keybindings ━━━\033[0m
-
-\033[38;2;166;227;161mj / k\033[0m          Move down / up
-\033[38;2;166;227;161mg / G\033[0m          Jump to top / bottom
-\033[38;2;166;227;161m/\033[0m              Search
-\033[38;2;166;227;161mEsc\033[0m            Close this help / exit search
-\033[38;2;166;227;161m?\033[0m              Toggle this help
-\033[38;2;166;227;161mq\033[0m              Quit
-
-\033[38;2;166;227;161mEnter\033[0m          Attach to session
-\033[38;2;166;227;161mCtrl-n\033[0m         Create new session
-\033[38;2;166;227;161mCtrl-d\033[0m         Attach & detach others
-\033[38;2;166;227;161mCtrl-w\033[0m         Window view (Esc to return)
-\033[38;2;166;227;161mr\033[0m              Rename session
-\033[38;2;166;227;161mCtrl-h\033[0m         Toggle hide/unhide
-\033[38;2;166;227;161mCtrl-a\033[0m         Toggle hidden sessions
-\033[38;2;166;227;161mCtrl-x\033[0m         Kill session
-\033[38;2;166;227;161mCtrl-e\033[0m         Edit description
-HELP
+    printf '\033[38;2;137;220;235m━━━ Keybindings ━━━\033[0m\n\n'
+    printf '\033[38;2;166;227;161mj / k\033[0m          Move down / up\n'
+    printf '\033[38;2;166;227;161mg / G\033[0m          Jump to top / bottom\n'
+    printf '\033[38;2;166;227;161m/\033[0m              Search\n'
+    printf '\033[38;2;166;227;161mEsc\033[0m            Exit search / return from help\n'
+    printf '\033[38;2;166;227;161m?\033[0m              Toggle this help\n'
+    printf '\033[38;2;166;227;161mq\033[0m              Quit\n\n'
+    printf '\033[38;2;166;227;161mEnter\033[0m          Attach to session\n'
+    printf '\033[38;2;166;227;161mCtrl-n\033[0m         Create new session\n'
+    printf '\033[38;2;166;227;161mCtrl-d\033[0m         Attach & detach others\n'
+    printf '\033[38;2;166;227;161mCtrl-w\033[0m         Window view (Esc to return)\n'
+    printf '\033[38;2;166;227;161mr\033[0m              Rename session\n'
+    printf '\033[38;2;166;227;161mCtrl-h\033[0m         Toggle hide/unhide\n'
+    printf '\033[38;2;166;227;161mCtrl-a\033[0m         Toggle hidden sessions\n'
+    printf '\033[38;2;166;227;161mCtrl-x\033[0m         Kill session\n'
+    printf '\033[38;2;166;227;161mCtrl-e\033[0m         Edit description\n'
     exit 0
     ;;
 
@@ -561,10 +557,10 @@ SEL="$(
     --bind 'start:disable-search' \
     --bind 'j:down,k:up,g:first,G:last,q:abort' \
     --bind '/:unbind(j,k,g,G,q,r)+enable-search+clear-query+change-prompt(search> )' \
-    --bind 'esc:rebind(j,k,g,G,q,r)+disable-search+clear-query+change-prompt(tmux> )' \
+    --bind 'esc:reload-sync($SCRIPT --internal-render "$SHOW_HIDDEN_FILE")+rebind(j,k,g,G,q,r)+disable-search+clear-query+change-prompt(tmux> )+change-preview($SCRIPT --internal-preview {})' \
     --bind "r:execute($SCRIPT --internal-rename {})+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
     --bind "ctrl-n:execute($SCRIPT --internal-new-session)+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
-    --bind "?:execute-silent(if [ -f \"$SHOW_HIDDEN_FILE.help\" ]; then rm -f \"$SHOW_HIDDEN_FILE.help\"; else printf 1 > \"$SHOW_HIDDEN_FILE.help\"; fi)+change-preview(if [ -f \"$SHOW_HIDDEN_FILE.help\" ]; then $SCRIPT --internal-help; else $SCRIPT --internal-preview {}; fi)" \
+    --bind "?:execute-silent(if [ -f \"$SHOW_HIDDEN_FILE.help\" ]; then rm -f \"$SHOW_HIDDEN_FILE.help\"; else printf 1 > \"$SHOW_HIDDEN_FILE.help\"; fi)+reload-sync(if [ -f \"$SHOW_HIDDEN_FILE.help\" ]; then echo; else $SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\"; fi)+change-preview(if [ -f \"$SHOW_HIDDEN_FILE.help\" ]; then $SCRIPT --internal-help; else $SCRIPT --internal-preview {}; fi)" \
     --bind "ctrl-a:reload($SCRIPT --internal-toggle-display \"$SHOW_HIDDEN_FILE\")" \
     --bind "ctrl-h:execute-silent($SCRIPT --internal-toggle-hidden {})+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
     --bind "ctrl-x:execute($SCRIPT --internal-kill-session {})+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
