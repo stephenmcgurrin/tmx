@@ -2,6 +2,20 @@
 
 Interactive tmux session manager via `fzf` with live preview.
 
+> **⚠️ Caveat emptor** — this is barely open source. It's the thing I use
+daily, polished to the point where others might enjoy it too. No roadmap, no
+support guarantees, but PRs are welcome.
+
+## Features
+
+- Session list with live pane-content preview — see what's running before you switch
+- Window drill-down (`Ctrl-w`) to jump directly to a specific window
+- Hide sessions you don't want cluttering the list (`Ctrl-h`)
+- Session descriptions/notes (`Ctrl-e`) stored in `~/.tmx-session-notes`
+- New-session flow with directory picker and recent-dir cache (`Ctrl-n`)
+- Configurable colors via env vars (Catppuccin-flavored by default)
+- Optional Nerd Font glyphs
+
 ## Requirements
 
 - tmux 2.6+, fzf 0.21+, POSIX `sh`
@@ -32,7 +46,7 @@ tmx
 | `Ctrl-w` | Drill into windows (`Esc` to return) |
 | `r` | Rename session |
 | `Ctrl-h` | Hide/unhide session |
-| `Ctrl-a` | Toggle hidden sessions |
+| `Ctrl-a` | Toggle hidden sessions (⚠️ conflicts with default tmux prefix) |
 | `Ctrl-x` | Kill session (with confirm) |
 | `Ctrl-e` | Edit session description |
 | `?` | Toggle help in preview |
@@ -40,6 +54,11 @@ tmx
 
 Session lines show `●` (current, green), `◎` (attached by others, amber), or
 unadorned (unattached), plus window count, client count, and last activity.
+
+### Hidden sessions
+
+`Ctrl-h` hides/unhides a session (stored in `~/.tmx-hidden-sessions`).
+`Ctrl-a` toggles the hidden-section visibility in the picker.
 
 ### Config
 
@@ -52,13 +71,25 @@ TMX_SORT_ORDER=alpha            # alpha | recent
 TMX_PREVIEW_WINDOW="right,75%,border-left,wrap"
 TMX_RECENT_DIRS_MAX=50
 TMX_NERD_FONTS=0                # set to 1 for Nerd Font glyphs
+
+# Colors (truecolor hex):
+TMX_COLOR_CURRENT="\033[38;2;166;227;161m"   # current session dot
+TMX_COLOR_ATTACHED="\033[38;2;249;226;175m"  # attached-by-others dot
+TMX_COLOR_WINDOWS="\033[38;2;148;226;213m"   # window count
+TMX_COLOR_CLIENTS="\033[38;2;250;179;135m"   # client count
+TMX_COLOR_ACTIVITY="\033[38;2;166;173;200m"  # last-activity label
 ```
 
 ### tmux popup
 
+Add this to `~/.tmux.conf` (adjust the bind key to taste):
+
 ```
-bind-key -T prefix P display-popup -E -w 90% -h 90% -T "tmx" "$HOME/bin/tmx"
+bind P display-popup -E -w 90% -h 90% -T "tmx" "$HOME/bin/tmx"
 ```
+
+> If your tmux `prefix` is `C-a`, pick a different bind — `Ctrl-a` is used by
+tmx to toggle hidden sessions and will be swallowed by tmux before tmx sees it.
 
 ## License
 
