@@ -557,7 +557,7 @@ SEL="$(
     --bind 'start:disable-search' \
     --bind 'j:down,k:up,g:first,G:last,q:abort' \
     --bind '/:unbind(j,k,g,G,q,r)+enable-search+clear-query+change-prompt(search> )' \
-    --bind 'esc:reload-sync($SCRIPT --internal-render "$SHOW_HIDDEN_FILE")+rebind(j,k,g,G,q,r)+disable-search+clear-query+change-prompt(tmux> )+change-preview($SCRIPT --internal-preview {})' \
+    --bind "esc:reload-sync($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")+rebind(j,k,g,G,q,r)+disable-search+clear-query+change-prompt(tmux> )+change-preview($SCRIPT --internal-preview {})" \
     --bind "r:execute($SCRIPT --internal-rename {})+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
     --bind "ctrl-n:execute($SCRIPT --internal-new-session)+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
     --bind "?:execute-silent(if [ -f \"$SHOW_HIDDEN_FILE.help\" ]; then rm -f \"$SHOW_HIDDEN_FILE.help\"; else printf 1 > \"$SHOW_HIDDEN_FILE.help\"; fi)+reload-sync(if [ -f \"$SHOW_HIDDEN_FILE.help\" ]; then echo; else $SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\"; fi)+change-preview(if [ -f \"$SHOW_HIDDEN_FILE.help\" ]; then $SCRIPT --internal-help; else $SCRIPT --internal-preview {}; fi)" \
