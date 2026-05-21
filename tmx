@@ -122,6 +122,13 @@ _render_panes() {
     _first="$("$TMUX_BIN" list-panes -t "$1:$2" -F '#{pane_index}' 2>/dev/null | head -1)"
     "$TMUX_BIN" capture-pane -ep -t "$1:$2.$_first" -S 0 2>/dev/null \
       || echo "  (no content)"
+    # Process tree for single-pane
+    _pid="$("$TMUX_BIN" list-panes -t "$1:$2.$_first" -F '#{pane_pid}' 2>/dev/null)"
+    if [ -n "$_pid" ] && command -v ps >/dev/null 2>&1; then
+      ps -o pid=,comm= --ppid "$_pid" 2>/dev/null | head -5 | while IFS= read -r _pline; do
+        printf '  %s\n' "$(printf '%s' "$_pline" | awk '{$1=$1;print}')"
+      done
+    fi
   else
     "$TMUX_BIN" list-panes -t "$1:$2" \
       -F '#{pane_index}|#{pane_active}' 2>/dev/null | while IFS='|' read -r _pi _pa; do
@@ -139,7 +146,7 @@ _render_panes() {
           printf '  │ %s\n' "$(printf '%s' "$_pline" | awk '{$1=$1;print}')"
         done
       fi
-      printf '  └─────────────\n'
+        printf '  └─────────────\n'
     done
   fi
 }
