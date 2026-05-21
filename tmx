@@ -122,14 +122,6 @@ _render_panes() {
     _first="$("$TMUX_BIN" list-panes -t "$1:$2" -F '#{pane_index}' 2>/dev/null | head -1)"
     "$TMUX_BIN" capture-pane -ep -t "$1:$2.$_first" -S 0 2>/dev/null \
       || echo "  (no content)"
-    # Process tree for single-pane
-    _pid="$("$TMUX_BIN" list-panes -t "$1:$2.$_first" -F '#{pane_pid}' 2>/dev/null)"
-    if [ -n "$_pid" ]; then
-      { pgrep -P "$_pid" 2>/dev/null || ps -o pid=,comm= --ppid "$_pid" 2>/dev/null; } | head -5 | while IFS= read -r _child; do
-        _cname="$(ps -o comm= -p "$_child" 2>/dev/null || echo '?')"
-        printf '  │ %s %s\n' "$_child" "$(printf '%s' "$_cname" | awk '{$1=$1;print}')"
-      done
-    fi
   else
     "$TMUX_BIN" list-panes -t "$1:$2" \
       -F '#{pane_index}|#{pane_active}' 2>/dev/null | while IFS='|' read -r _pi _pa; do
@@ -140,19 +132,13 @@ _render_panes() {
       fi
       "$TMUX_BIN" capture-pane -ep -t "$1:$2.$_pi" -S 0 -E 15 2>/dev/null \
         | sed 's/^/  │ /' || echo '  │ (no content)'
-      # Process tree
-      _pid="$("$TMUX_BIN" list-panes -t "$1:$2.$_pi" -F '#{pane_pid}' 2>/dev/null)"
-      if [ -n "$_pid" ]; then
-        { pgrep -P "$_pid" 2>/dev/null || ps -o pid=,comm= --ppid "$_pid" 2>/dev/null; } | head -5 | while IFS= read -r _child; do
-          _cname="$(ps -o comm= -p "$_child" 2>/dev/null || echo '?')"
-          printf '  │ %s %s\n' "$_child" "$(printf '%s' "$_cname" | awk '{$1=$1;print}')"
-        done
-      fi
-        printf '  └─────────────\n'
+      printf '  └─────────────\n'
     done
   fi
 }
 
+# Summarize running processes across all session panes.
+# Output: "nvim cargo zsh" or empty if nothing interesting.
 preview_session() {
   s="$1"
   case "$s" in
@@ -170,10 +156,17 @@ preview_session() {
       _panedir="$("$TMUX_BIN" display-message -t "$s" -p '#{pane_current_path}' 2>/dev/null)"
       _branch="$(git -C "$_panedir" branch --show-current 2>/dev/null || true)"
       [ -n "$_branch" ] && printf '\033[38;2;203;166;247m⎇ %s\033[0m\n' "$_branch"
+      # Process summary — key processes running in all panes
+      _running="$("$TMUX_BIN" list-panes -t "$s" -F '#{pane_pid}' 2>/dev/null | while IFS= read -r _pp; do
+        pgrep -P "$_pp" 2>/dev/null | head -3 | while read -r _cp; do
+          ps -o comm= -p "$_cp" 2>/dev/null
+        done
+      done | sort -u | head -10 | tr '\n' ' ' | sed 's/ $//')"
+      [ -n "$_running" ] && printf '\033[38;2;148;226;213m▸ %s\033[0m\n' "$_running"
       # Session description
       if [ -f "$NOTES_FILE" ]; then
         _desc="$(grep -F "$s"$'\t' "$NOTES_FILE" 2>/dev/null | cut -f2-)"
-        [ -n "$_desc" ] && printf '\033[38;2;250;179;135m%s\033[0m\n\n' "$_desc"
+        [ -n "$_desc" ] && printf '\033[38;2;250;179;135m%s\033[0m\n' "$_desc"
       fi
 
       "$TMUX_BIN" list-windows -t "$s" \
