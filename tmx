@@ -18,7 +18,7 @@ esac
 
 # ─── Helper functions ──────────────────────────────────────────
 
-clean_sel() { printf '%s' "$1" | sed 's/\x1b\[[0-9;]*m//g; s/^[[:space:]]*//; s/[[:space:]]*[0-9]*w.*$//; s/^[●*] //; s/^ *//'; }
+clean_sel() { printf '%s' "$1" | sed 's/\x1b\[[0-9;]*m//g; s/^[[:space:]]*//; s/[[:space:]]*[0-9]*w.*$//; s/^[●*◎] //; s/^ *//'; }
 
 skip_header() {
   case "$1" in *━━━*|'') return 1 ;; esac
@@ -290,8 +290,7 @@ $home_dirs"
       --prompt='dir> ' --info=inline \
       --header="Enter: select | Esc: use current dir ($(pwd))${ext_header}" \
       --preview "$SCRIPT --internal-preview-dir {}" \
-      --preview-window=right,50%,border-left \
-      --bind 'change:reload-sync(printf "%s\n" "$_input")' || true)"
+      --preview-window=right,50%,border-left || true)"
   # Reject sentinel lines — treat as Esc (use current dir)
   case "$dir" in ---external---|'') dir="" ;; esac
   case "$dir" in ---recent---) dir="" ;; esac
