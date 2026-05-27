@@ -340,10 +340,10 @@ $home_dirs"
   dir="$(printf '%s\n' "$_input" | \
   fzf --height=90% --layout=reverse --border \
       --prompt='dir> ' --info=inline \
-      --header="Enter: select | Esc: use current dir ($(pwd))${ext_header} | Ctrl-p: pin dir" \
+      --header="Enter: select | Esc: use current dir ($(pwd))${ext_header} | Ctrl-f: pin dir" \
       --preview "$SCRIPT --internal-preview-dir {}" \
       --preview-window=right,50%,border-left \
-      --bind "ctrl-p:execute-silent($SCRIPT --internal-toggle-bookmark {})" || true)"
+      --bind "ctrl-f:execute-silent($SCRIPT --internal-toggle-bookmark {})" || true)"
   # Reject sentinel lines — treat as Esc (use current dir)
   case "$dir" in ---external---|'') dir="" ;; esac
   case "$dir" in ---recent---) dir="" ;; esac
@@ -397,7 +397,7 @@ case "${1:-}" in
     printf '%s\n' "  j/k: up/down  g/G: top/bottom  /: search  Esc: exit search  q: quit"
     printf '%s\n' "  Enter: attach   Ctrl-d: attach+detach   r: rename"
     printf '%s\n' "  Ctrl-h: hide/unhide   Ctrl-a: toggle hidden   Ctrl-x: kill session/window"
-    printf '%s\n' "  Ctrl-e: edit description   Ctrl-l: color tag   Ctrl-p: pin bookmark"
+    printf '%s\n' "  Ctrl-e: edit description   Ctrl-l: color tag   Ctrl-f: pin bookmark"
     printf '%s\n' "  Ctrl-w: window view (Esc to return)"
     printf '%s\n' "  tmx --last         jump to previous session"
     printf '%s\n' ""
@@ -580,7 +580,7 @@ case "${1:-}" in
     printf '\033[38;2;166;227;161mCtrl-x\033[0m         Kill session / kill window\n'
     printf '\033[38;2;166;227;161mCtrl-e\033[0m         Edit description\n'
     printf '\033[38;2;166;227;161mCtrl-l\033[0m         Set color tag\n'
-    printf '\033[38;2;166;227;161mCtrl-p\033[0m         Pin/unpin bookmark\n'
+    printf '\033[38;2;166;227;161mCtrl-f\033[0m         Pin/unpin bookmark\n'
     exit 0
     ;;
 

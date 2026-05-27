@@ -71,7 +71,7 @@ appears before the session name. Colors are stored in
 
 ### Bookmarked directories
 
-In the new-session directory picker (`Ctrl-n`), `Ctrl-p` pins/unpins the
+In the new-session directory picker (`Ctrl-n`), `Ctrl-f` pins/unpins the
 currently selected directory. Bookmarked dirs appear in a `---bookmarks---`
 section at the very top of the list. Stored in `~/.cache/tmx/bookmarks`.
 
