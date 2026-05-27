@@ -139,7 +139,7 @@ EOF
       elif [ "$_c" -gt 0 ] 2>/dev/null; then
         printf '%s%s%s  \033[0m%s%sw\033[0m %s%sc\033[0m %s%s\033[0m\n' "$_tag_dot" "$TMX_COLOR_ATTACHED" "$s" "$TMX_COLOR_WINDOWS" "$_w" "$TMX_COLOR_CLIENTS" "$_c" "$TMX_COLOR_ACTIVITY" "$_act"
       else
-        printf '%s  %s%sw\033[0m %s%sc\033[0m %s%s\033[0m\n' "$_tag_dot" "$s" "$TMX_COLOR_WINDOWS" "$_w" "$TMX_COLOR_CLIENTS" "$_c" "$TMX_COLOR_ACTIVITY" "$_act"
+        printf '%s%s  %s%sw\033[0m %s%sc\033[0m %s%s\033[0m\n' "$_tag_dot" "$s" "$TMX_COLOR_WINDOWS" "$_w" "$TMX_COLOR_CLIENTS" "$_c" "$TMX_COLOR_ACTIVITY" "$_act"
       fi
     fi
   done <<EOF
