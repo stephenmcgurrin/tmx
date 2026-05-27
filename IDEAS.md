@@ -26,9 +26,9 @@ prefix.
 just session names. Type `vim` and see every session with a window running
 vim, with the matching window name highlighted in the preview.
 
-### Bookmarks / pinned directories
+### Bookmarks / pinned directories ✅ (v1.3.0)
 
-Let the user pin directories (`Ctrl-p` in the dir picker?) that always appear
+Let the user pin directories (`Ctrl-p` in the dir picker) that always appear
 at the top of the directory list, above recent dirs. Stored as a plaintext
 file in `~/.cache/tmx/bookmarks`. A dead-simple way to keep your top 5–10
 project roots one keystroke away.
@@ -54,20 +54,19 @@ which are active) and surfaces them at the top regardless of actual tmux
 activity timestamps. Could be a simple `~/.cache/tmx/mru` file appended on
 every attach.
 
-### Per-session color tagging
+### Per-session color tagging ✅ (v1.3.0)
 
 Let users assign a color label to a session (`Ctrl-l` → pick from a small
 palette). The session line gets a colored bar or dot. Useful for visually
 partitioning "work" vs "personal" vs "experiment" sessions. Stored in
 `~/.tmx-session-notes` alongside descriptions.
 
-### Quick-last: jump to previous session
+### Quick-last: jump to previous session ✅ (v1.3.0)
 
-A `tmx --last` flag or a `Ctrl-l` bind in the main picker that immediately
-attaches to whichever session you were in before the current one. Like `cd -`
-for tmux sessions. Could read from the MRU file.
+A `tmx --last` flag that immediately attaches to whichever session you were in
+before the current one. Like `cd -` for tmux sessions. Uses the MRU file.
 
-### Window-level kill
+### Window-level kill ✅ (v1.3.0)
 
 Extend `Ctrl-x` so that in window drill-down view it kills just that window
 instead of the whole session. A confirmation prompt with the window name
