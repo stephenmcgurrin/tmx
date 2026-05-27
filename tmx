@@ -603,8 +603,19 @@ case "${1:-}" in
   --internal-set-color)
     session="$(clean_sel "$2")"
     skip_header "$session" || exit 0
-    _palette="$(_color_escape red)red\033[0m\n$(_color_escape green)green\033[0m\n$(_color_escape blue)blue\033[0m\n$(_color_escape yellow)yellow\033[0m\n$(_color_escape magenta)magenta\033[0m\n$(_color_escape cyan)cyan\033[0m\n$(_color_escape white)white\033[0m\n$(_color_escape gray)gray\033[0m\n(none)"
-    _choice="$(printf '%s\n' "$_palette" | fzf --height=20 --layout=reverse --prompt='color> ' --ansi --no-preview < /dev/tty)"
+    _f="$(mktemp)"
+    printf '%b\n' \
+      "$(_color_escape red)red\033[0m" \
+      "$(_color_escape green)green\033[0m" \
+      "$(_color_escape blue)blue\033[0m" \
+      "$(_color_escape yellow)yellow\033[0m" \
+      "$(_color_escape magenta)magenta\033[0m" \
+      "$(_color_escape cyan)cyan\033[0m" \
+      "$(_color_escape white)white\033[0m" \
+      "$(_color_escape gray)gray\033[0m" \
+      '(none)' > "$_f"
+    _choice="$(cat "$_f" | fzf --height=20 --layout=reverse --prompt='color> ' --ansi --no-preview)"
+    rm -f "$_f"
     [ -z "$_choice" ] && exit 0
     # Remove ANSI escapes from choice
     _color="$(printf '%s' "$_choice" | sed 's/\x1b\[[0-9;]*m//g')"
