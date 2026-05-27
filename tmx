@@ -131,7 +131,9 @@ EOF
       fi
       _tag_color="$(_color_tag_for_session "$s")"
       _tag_dot=""
-      [ -n "$_tag_color" ] && _tag_dot="${_tag_color}● \033[0m"
+      if [ -n "$_tag_color" ]; then
+        _tag_dot="${_tag_color}● $(printf '\033[0m')"
+      fi
       if [ -n "${TMUX-}" ] && [ "$s" = "$("$TMUX_BIN" display-message -p '#S' 2>/dev/null)" ]; then
         printf '%s%s● %s  \033[0m%s%sw\033[0m %s%sc\033[0m %s%s\033[0m\n' "$_tag_dot" "$TMX_COLOR_CURRENT" "$s" "$TMX_COLOR_WINDOWS" "$_w" "$TMX_COLOR_CLIENTS" "$_c" "$TMX_COLOR_ACTIVITY" "$_act"
       elif [ "$_c" -gt 0 ] 2>/dev/null; then
