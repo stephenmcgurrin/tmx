@@ -54,9 +54,9 @@ tmx --last   # jump to previous session
 | `?` | Toggle help in preview |
 | `q` | Quit |
 
-Session lines show `●` (current, green), `◎` (attached by others, amber), or
-unadorned (unattached), plus window count, client count, and last activity.
-Color-tagged sessions show a colored dot before the status marker.
+Session lines show the session name in green (current) or amber (attached
+by others), or unadorned (unattached), plus window count, client count,
+and last activity. Color-tagged sessions show a colored dot before the name.
 
 ### Hidden sessions
 
@@ -66,7 +66,7 @@ Color-tagged sessions show a colored dot before the status marker.
 ### Color tags
 
 `Ctrl-l` opens a palette to assign a color label to a session. The colored dot
-appears before the status marker on the session line. Colors are stored in
+appears before the session name. Colors are stored in
 `~/.tmx-session-notes` alongside descriptions. Select `(none)` to remove a tag.
 
 ### Bookmarked directories
