@@ -1,0 +1,143 @@
+{
+  "stage": "facts",
+  "title": "Four tmx enhancements: facts",
+  "goalSlug": "four-enhancements",
+  "facts": [
+    {
+      "id": "bookmark-file",
+      "text": "Bookmarked directories are stored in ~/.cache/tmx/bookmarks, one absolute path per line.",
+      "accepted": false,
+      "removed": false,
+      "recommendedAutomatedVerification": true,
+      "automatedVerification": true
+    },
+    {
+      "id": "bookmark-render",
+      "text": "In the directory picker, bookmarked dirs appear in a '---bookmarks---' section at the very top, above the '---recent---' section.",
+      "accepted": false,
+      "removed": false,
+      "recommendedAutomatedVerification": true,
+      "automatedVerification": true
+    },
+    {
+      "id": "bookmark-toggle",
+      "text": "Ctrl-p in the directory picker toggles the currently selected directory as bookmarked or unbookmarked.",
+      "accepted": false,
+      "removed": false,
+      "recommendedAutomatedVerification": true,
+      "automatedVerification": true
+    },
+    {
+      "id": "bookmark-sentinels",
+      "text": "Selecting the '---bookmarks---' sentinel line acts like Esc (falls through to current dir), consistent with how '---recent---' and '---external---' are handled.",
+      "accepted": false,
+      "removed": false,
+      "recommendedAutomatedVerification": true,
+      "automatedVerification": true
+    },
+    {
+      "id": "color-storage",
+      "text": "Per-session color tags are stored in ~/.tmx-session-notes as a third tab-delimited field: session<TAB>description<TAB>color. Sessions without a color tag have no third field (backward compatible).",
+      "accepted": false,
+      "removed": false,
+      "recommendedAutomatedVerification": true,
+      "automatedVerification": true
+    },
+    {
+      "id": "color-palette",
+      "text": "Ctrl-l in the main picker opens a small fzf palette with 8 colors (red, green, blue, yellow, magenta, cyan, white, gray) plus a '(none)' option to clear the tag. Colors use truecolor ANSI escapes consistent with the existing Catppuccin-inspired palette.",
+      "accepted": false,
+      "removed": false,
+      "recommendedAutomatedVerification": true,
+      "automatedVerification": true
+    },
+    {
+      "id": "color-render",
+      "text": "Tagged sessions show a colored dot (●) immediately before the status marker. For example, a current session tagged red renders as '[red dot] ● my-session  1w 0c'. The colored dot uses the same ANSI truecolor escape format as TMX_COLOR_CURRENT.",
+      "accepted": false,
+      "removed": false,
+      "recommendedAutomatedVerification": true,
+      "automatedVerification": true
+    },
+    {
+      "id": "color-help",
+      "text": "The Ctrl-l keybind is documented in --internal-help and the README keybindings table.",
+      "accepted": false,
+      "removed": false,
+      "recommendedAutomatedVerification": false,
+      "automatedVerification": false
+    },
+    {
+      "id": "mru-file",
+      "text": "Session attach order is tracked in ~/.cache/tmx/mru, one session name per line, most-recently-used first. The file is deduplicated on every write: if the session already appears, the old entry is removed before prepending.",
+      "accepted": false,
+      "removed": false,
+      "recommendedAutomatedVerification": true,
+      "automatedVerification": true
+    },
+    {
+      "id": "mru-write",
+      "text": "The MRU file is updated by attach_normal() and attach_detach_others() — any code path where tmx switches the user to a session.",
+      "accepted": false,
+      "removed": false,
+      "recommendedAutomatedVerification": true,
+      "automatedVerification": true
+    },
+    {
+      "id": "last-flag",
+      "text": "tmx --last reads line 2 of ~/.cache/tmx/mru (line 1 is current) and attaches to that session directly, bypassing the fzf picker. If the MRU file has fewer than 2 entries, it prints 'No previous session' and exits 0.",
+      "accepted": false,
+      "removed": false,
+      "recommendedAutomatedVerification": true,
+      "automatedVerification": true
+    },
+    {
+      "id": "last-help",
+      "text": "tmx --last is documented in --help output and the README.",
+      "accepted": false,
+      "removed": false,
+      "recommendedAutomatedVerification": false,
+      "automatedVerification": false
+    },
+    {
+      "id": "win-kill-context",
+      "text": "Ctrl-x is context-aware: in the main session list it kills the selected session (existing behavior); in the window drill-down view it kills the selected window instead.",
+      "accepted": false,
+      "removed": false,
+      "recommendedAutomatedVerification": true,
+      "automatedVerification": true
+    },
+    {
+      "id": "win-kill-detect",
+      "text": "Window view is detected by the presence of the ${TMX_STATE_FILE}.win file, which is created by --internal-list-windows and cleaned up on Esc/exit.",
+      "accepted": false,
+      "removed": false,
+      "recommendedAutomatedVerification": true,
+      "automatedVerification": true
+    },
+    {
+      "id": "win-kill-confirm",
+      "text": "Killing a window prompts 'Kill window <session>:<index> (<name>)? [y/N]' with the same confirmation style as session kill. Non-yes answers abort.",
+      "accepted": false,
+      "removed": false,
+      "recommendedAutomatedVerification": true,
+      "automatedVerification": true
+    },
+    {
+      "id": "win-kill-reload",
+      "text": "After killing a window, if the session still has remaining windows, the window list reloads in-place. If no windows remain (session is now empty), the picker falls back to the session list. Kill uses reload-sync for synchronous behavior.",
+      "accepted": false,
+      "removed": false,
+      "recommendedAutomatedVerification": true,
+      "automatedVerification": true
+    },
+    {
+      "id": "cross-no-regressions",
+      "text": "Existing functionality is unchanged: session attach/detach, session rename, session hide/kill, directory picker scan/recent, preview panes, window drill-down navigation, help overlay, search, and all existing keybinds.",
+      "accepted": false,
+      "removed": false,
+      "recommendedAutomatedVerification": true,
+      "automatedVerification": true
+    }
+  ]
+}

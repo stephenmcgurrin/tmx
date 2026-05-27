@@ -8,6 +8,8 @@
 TMUX_BIN="$(command -v tmux)"
 HIDDEN_FILE="${HOME}/.tmx-hidden-sessions"
 NOTES_FILE="${HOME}/.tmx-session-notes"
+MRU_FILE="${HOME}/.cache/tmx/mru"
+BOOKMARK_FILE="${HOME}/.cache/tmx/bookmarks"
 
 # Resolve script to absolute path for reliable fzf bind callbacks
 case "$0" in
@@ -47,6 +49,41 @@ toggle_hidden() {
     fi
   else
     printf '%s\n' "$session" >> "$HIDDEN_FILE"
+  fi
+}
+
+# Update MRU file: bump $1 to the top, deduplicating.
+mru_update() {
+  _mru_dir="${HOME}/.cache/tmx"
+  mkdir -p "$_mru_dir" 2>/dev/null
+  if [ -f "$MRU_FILE" ]; then
+    grep -Fxv "$1" "$MRU_FILE" > "${MRU_FILE}.tmp" 2>/dev/null || true
+    printf '%s\n' "$1" | cat - "${MRU_FILE}.tmp" 2>/dev/null > "$MRU_FILE"
+    rm -f "${MRU_FILE}.tmp"
+  else
+    printf '%s\n' "$1" > "$MRU_FILE"
+  fi
+}
+
+# ─── Color palette helpers ─────────────────────────────────────
+
+_color_escape() {
+  case "$1" in
+    red)     printf '\033[38;2;243;139;168m' ;;
+    green)   printf '\033[38;2;166;227;161m' ;;
+    blue)    printf '\033[38;2;137;180;250m' ;;
+    yellow)  printf '\033[38;2;249;226;175m' ;;
+    magenta) printf '\033[38;2;203;166;247m' ;;
+    cyan)    printf '\033[38;2;148;226;213m' ;;
+    white)   printf '\033[38;2;205;214;244m' ;;
+    gray)    printf '\033[38;2;108;112;134m' ;;
+  esac
+}
+
+_color_tag_for_session() {
+  if [ -f "$NOTES_FILE" ]; then
+    _tag="$(grep -F "$1"$'\t' "$NOTES_FILE" 2>/dev/null | head -1 | cut -f3-)"
+    [ -n "$_tag" ] && _color_escape "$_tag"
   fi
 }
 
@@ -92,12 +129,13 @@ EOF
       else
         _act="$(( _diff / 86400 ))d"
       fi
+      _tag_dot="$(_color_tag_for_session "$s"; [ -n "$(_color_tag_for_session "$s")" ] && printf '● \033[0m' || true)"
       if [ -n "${TMUX-}" ] && [ "$s" = "$("$TMUX_BIN" display-message -p '#S' 2>/dev/null)" ]; then
-        printf '%s● %s  \033[0m%s%sw\033[0m %s%sc\033[0m %s%s\033[0m\n' "$TMX_COLOR_CURRENT" "$s" "$TMX_COLOR_WINDOWS" "$_w" "$TMX_COLOR_CLIENTS" "$_c" "$TMX_COLOR_ACTIVITY" "$_act"
+        printf '%s%s● %s  \033[0m%s%sw\033[0m %s%sc\033[0m %s%s\033[0m\n' "$_tag_dot" "$TMX_COLOR_CURRENT" "$s" "$TMX_COLOR_WINDOWS" "$_w" "$TMX_COLOR_CLIENTS" "$_c" "$TMX_COLOR_ACTIVITY" "$_act"
       elif [ "$_c" -gt 0 ] 2>/dev/null; then
-        printf '%s◎ %s  \033[0m%s%sw\033[0m %s%sc\033[0m %s%s\033[0m\n' "$TMX_COLOR_ATTACHED" "$s" "$TMX_COLOR_WINDOWS" "$_w" "$TMX_COLOR_CLIENTS" "$_c" "$TMX_COLOR_ACTIVITY" "$_act"
+        printf '%s%s◎ %s  \033[0m%s%sw\033[0m %s%sc\033[0m %s%s\033[0m\n' "$_tag_dot" "$TMX_COLOR_ATTACHED" "$s" "$TMX_COLOR_WINDOWS" "$_w" "$TMX_COLOR_CLIENTS" "$_c" "$TMX_COLOR_ACTIVITY" "$_act"
       else
-        printf '%s  %s%sw\033[0m %s%sc\033[0m %s%s\033[0m\n' "$s" "$TMX_COLOR_WINDOWS" "$_w" "$TMX_COLOR_CLIENTS" "$_c" "$TMX_COLOR_ACTIVITY" "$_act"
+        printf '%s%s  %s%sw\033[0m %s%sc\033[0m %s%s\033[0m\n' "$_tag_dot" "$s" "$TMX_COLOR_WINDOWS" "$_w" "$TMX_COLOR_CLIENTS" "$_c" "$TMX_COLOR_ACTIVITY" "$_act"
       fi
     fi
   done <<EOF
@@ -200,6 +238,7 @@ attach_normal() {
   else
     "$TMUX_BIN" attach-session -t "$1"
   fi
+  mru_update "$1"
 }
 
 attach_detach_others() {
@@ -209,6 +248,7 @@ attach_detach_others() {
   else
     "$TMUX_BIN" attach-session -d -t "$1"
   fi
+  mru_update "$1"
 }
 
 # ─── Directory scanner / picker ─────────────────────────────────
@@ -271,10 +311,18 @@ $mnt_dirs"
     [ -n "$ext_dirs" ] && ext_header=" | External drives included"
   fi
 
-  # Build final list: recent dirs first, then home+external
+  # Build final list: bookmarks first, then recent, then home+external
   _input=""
+  if [ -f "$BOOKMARK_FILE" ]; then
+    _bookmarks="$(cat "$BOOKMARK_FILE" 2>/dev/null)"
+    if [ -n "$_bookmarks" ]; then
+      _input="---bookmarks---
+$_bookmarks"
+    fi
+  fi
   if [ -n "$_recent" ]; then
-    _input="---recent---
+    _input="${_input}
+---recent---
 $_recent"
   fi
   if [ -n "$ext_dirs" ]; then
@@ -288,12 +336,14 @@ $home_dirs"
   dir="$(printf '%s\n' "$_input" | \
   fzf --height=90% --layout=reverse --border \
       --prompt='dir> ' --info=inline \
-      --header="Enter: select | Esc: use current dir ($(pwd))${ext_header}" \
+      --header="Enter: select | Esc: use current dir ($(pwd))${ext_header} | Ctrl-p: pin dir" \
       --preview "$SCRIPT --internal-preview-dir {}" \
-      --preview-window=right,50%,border-left || true)"
+      --preview-window=right,50%,border-left \
+      --bind "ctrl-p:execute-silent($SCRIPT --internal-toggle-bookmark {})" || true)"
   # Reject sentinel lines — treat as Esc (use current dir)
   case "$dir" in ---external---|'') dir="" ;; esac
   case "$dir" in ---recent---) dir="" ;; esac
+  case "$dir" in ---bookmarks---) dir="" ;; esac
   printf '%s\n' "$dir"
 }
 
@@ -342,8 +392,10 @@ case "${1:-}" in
     printf '%s\n' ""
     printf '%s\n' "  j/k: up/down  g/G: top/bottom  /: search  Esc: exit search  q: quit"
     printf '%s\n' "  Enter: attach   Ctrl-d: attach+detach   r: rename"
-    printf '%s\n' "  Ctrl-h: hide/unhide   Ctrl-a: toggle hidden   Ctrl-x: kill"
-    printf '%s\n' "  Ctrl-e: edit description   Ctrl-w: window view (Esc to return)"
+    printf '%s\n' "  Ctrl-h: hide/unhide   Ctrl-a: toggle hidden   Ctrl-x: kill session/window"
+    printf '%s\n' "  Ctrl-e: edit description   Ctrl-l: color tag   Ctrl-p: pin bookmark"
+    printf '%s\n' "  Ctrl-w: window view (Esc to return)"
+    printf '%s\n' "  tmx --last: jump to most recent session"
     printf '%s\n' ""
     printf '%s\n' "Config: ~/.tmxrc (sourced as shell)"
     printf '%s\n' "  TMX_SCAN_DEPTH=3          find depth for dir picker"
@@ -356,6 +408,20 @@ case "${1:-}" in
     printf '%s\n' "  TMX_COLOR_WINDOWS=\033[38;2;148;226;213m  window count"
     printf '%s\n' "  TMX_COLOR_CLIENTS=\033[38;2;250;179;135m  client count"
     printf '%s\n' "  TMX_COLOR_ACTIVITY=\033[38;2;166;173;200m  activity time"
+    printf '%s\n' ""
+    printf '%s\n' "  tmx --last         jump to previous session"
+    exit 0
+    ;;
+
+  --last)
+    if [ -f "$MRU_FILE" ]; then
+      _prev="$(sed -n '2p' "$MRU_FILE" 2>/dev/null || true)"
+      if [ -n "$_prev" ]; then
+        attach_normal "$_prev"
+        exit 0
+      fi
+    fi
+    printf 'No previous session.\n' >&2
     exit 0
     ;;
 
@@ -398,6 +464,11 @@ case "${1:-}" in
       printf '%s\n' "$newname" >> "${HIDDEN_FILE}.tmp"
       mv "${HIDDEN_FILE}.tmp" "$HIDDEN_FILE"
     fi
+    # Update MRU: replace old name with new name
+    if [ -f "$MRU_FILE" ]; then
+      sed -i '' "s/^${session}$/${newname}/" "$MRU_FILE" 2>/dev/null || \
+        sed -i "s/^${session}$/${newname}/" "$MRU_FILE" 2>/dev/null || true
+    fi
     exit 0
     ;;
 
@@ -427,10 +498,64 @@ case "${1:-}" in
     exit 0
     ;;
 
+  # usage:  tmx --internal-kill-window <window-line>
+  --internal-kill-window)
+    _s="$(cat "${TMX_STATE_FILE}.winsession" 2>/dev/null || echo '')"
+    [ -z "$_s" ] && exit 0
+    _win="$(printf '%s' "$2" | sed 's/^[● ]*//; s/:.*//')"
+    [ -z "$_win" ] && exit 0
+    _wname="$("$TMUX_BIN" list-windows -t "$_s" -F '#{window_name}' -f "#{==:#{window_index},$_win}" 2>/dev/null || echo '?')"
+    printf 'Kill window %s:%s ("%s")? [y/N] ' "$_s" "$_win" "$_wname" >/dev/tty
+    IFS= read -r ans </dev/tty || exit 0
+    case "$ans" in [yY]|[yY][eE][sS]) ;; *) exit 0 ;; esac
+    "$TMUX_BIN" kill-window -t "$_s:$_win"
+    exit 0
+    ;;
+
+  # usage:  tmx --internal-kill-context <selection>
+  # Context-aware kill: window kill if in window view, session kill otherwise.
+  --internal-kill-context)
+    if [ -f "${TMX_STATE_FILE}.win" ]; then
+      "$SCRIPT" --internal-kill-window "$2"
+    else
+      "$SCRIPT" --internal-kill-session "$2"
+    fi
+    exit 0
+    ;;
+
+  # usage:  tmx --internal-reload-after-kill <show-hidden-file>
+  # After a context-aware kill, reload the appropriate view.
+  --internal-reload-after-kill)
+    if [ -f "${TMX_STATE_FILE}.win" ]; then
+      _s="$(cat "${TMX_STATE_FILE}.winsession" 2>/dev/null || echo '')"
+      if [ -n "$_s" ] && "$TMUX_BIN" list-windows -t "$_s" >/dev/null 2>&1; then
+        "$SCRIPT" --internal-list-windows "$_s"
+      else
+        rm -f "${TMX_STATE_FILE}.win"
+        "$SCRIPT" --internal-render "$2"
+      fi
+    else
+      "$SCRIPT" --internal-render "$2"
+    fi
+    exit 0
+    ;;
+
   # usage:  tmx --internal-new-session
   --internal-new-session)
     # Run create_session inline (prompts for name, picks dir, attaches)
     create_session
+    exit 0
+    ;;
+
+  # usage:  tmx --internal-toggle-bookmark <path>
+  --internal-toggle-bookmark)
+    _p="$2"
+    if [ -f "$BOOKMARK_FILE" ] && grep -Fxq "$_p" "$BOOKMARK_FILE" 2>/dev/null; then
+      grep -Fxv "$_p" "$BOOKMARK_FILE" > "${BOOKMARK_FILE}.tmp" 2>/dev/null || true
+      mv "${BOOKMARK_FILE}.tmp" "$BOOKMARK_FILE"
+    else
+      printf '%s\n' "$_p" >> "$BOOKMARK_FILE"
+    fi
     exit 0
     ;;
 
@@ -450,8 +575,10 @@ case "${1:-}" in
     printf '\033[38;2;166;227;161mr\033[0m              Rename session\n'
     printf '\033[38;2;166;227;161mCtrl-h\033[0m         Toggle hide/unhide\n'
     printf '\033[38;2;166;227;161mCtrl-a\033[0m         Toggle hidden sessions\n'
-    printf '\033[38;2;166;227;161mCtrl-x\033[0m         Kill session\n'
+    printf '\033[38;2;166;227;161mCtrl-x\033[0m         Kill session / kill window\n'
     printf '\033[38;2;166;227;161mCtrl-e\033[0m         Edit description\n'
+    printf '\033[38;2;166;227;161mCtrl-l\033[0m         Set color tag\n'
+    printf '\033[38;2;166;227;161mCtrl-p\033[0m         Pin/unpin bookmark\n'
     exit 0
     ;;
 
@@ -469,6 +596,40 @@ case "${1:-}" in
       mv "${NOTES_FILE}.tmp" "$NOTES_FILE"
     fi
     [ -n "$desc" ] && printf '%s\t%s\n' "$session" "$desc" >> "$NOTES_FILE"
+    exit 0
+    ;;
+
+  # usage:  tmx --internal-set-color <session-name>
+  --internal-set-color)
+    session="$(clean_sel "$2")"
+    skip_header "$session" || exit 0
+    _palette="$(_color_escape red)red\033[0m\n$(_color_escape green)green\033[0m\n$(_color_escape blue)blue\033[0m\n$(_color_escape yellow)yellow\033[0m\n$(_color_escape magenta)magenta\033[0m\n$(_color_escape cyan)cyan\033[0m\n$(_color_escape white)white\033[0m\n$(_color_escape gray)gray\033[0m\n(none)"
+    _choice="$(printf '%s\n' "$_palette" | fzf --height=20 --layout=reverse --prompt='color> ' --ansi --no-preview < /dev/tty)"
+    [ -z "$_choice" ] && exit 0
+    # Remove ANSI escapes from choice
+    _color="$(printf '%s' "$_choice" | sed 's/\x1b\[[0-9;]*m//g')"
+    # Read existing notes, update or add color field
+    if [ -f "$NOTES_FILE" ]; then
+      _existing="$(grep -F "$session"$'\t' "$NOTES_FILE" 2>/dev/null | head -1)"
+      if [ -n "$_existing" ]; then
+        _desc="$(printf '%s' "$_existing" | cut -f2)"
+        grep -Fv "$session"$'\t' "$NOTES_FILE" > "${NOTES_FILE}.tmp" 2>/dev/null || true
+        mv "${NOTES_FILE}.tmp" "$NOTES_FILE"
+        if [ "$_color" = "(none)" ]; then
+          [ -n "$_desc" ] && printf '%s\t%s\n' "$session" "$_desc" >> "$NOTES_FILE"
+        else
+          printf '%s\t%s\t%s\n' "$session" "$_desc" "$_color" >> "$NOTES_FILE"
+        fi
+      else
+        if [ "$_color" != "(none)" ]; then
+          printf '%s\t\t%s\n' "$session" "$_color" >> "$NOTES_FILE"
+        fi
+      fi
+    else
+      if [ "$_color" != "(none)" ]; then
+        printf '%s\t\t%s\n' "$session" "$_color" >> "$NOTES_FILE"
+      fi
+    fi
     exit 0
     ;;
 
@@ -591,8 +752,9 @@ SEL="$(
     --bind "?:execute-silent(if [ -f \"$SHOW_HIDDEN_FILE.help\" ]; then rm -f \"$SHOW_HIDDEN_FILE.help\"; else printf 1 > \"$SHOW_HIDDEN_FILE.help\"; fi)+reload-sync(if [ -f \"$SHOW_HIDDEN_FILE.help\" ]; then echo; else $SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\"; fi)+change-preview(if [ -f \"$SHOW_HIDDEN_FILE.help\" ]; then $SCRIPT --internal-help; else $SCRIPT --internal-preview {}; fi)" \
     --bind "ctrl-a:reload($SCRIPT --internal-toggle-display \"$SHOW_HIDDEN_FILE\")" \
     --bind "ctrl-h:execute-silent($SCRIPT --internal-toggle-hidden {})+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
-    --bind "ctrl-x:execute($SCRIPT --internal-kill-session {})+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
+    --bind "ctrl-x:execute($SCRIPT --internal-kill-context {})+reload-sync($SCRIPT --internal-reload-after-kill \"$SHOW_HIDDEN_FILE\")" \
     --bind "ctrl-e:execute($SCRIPT --internal-set-description {})+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
+    --bind "ctrl-l:execute($SCRIPT --internal-set-color {})+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
     --bind "ctrl-w:reload($SCRIPT --internal-list-windows {})+change-preview($SCRIPT --internal-preview-window {})" \
     --preview "$SCRIPT --internal-preview {}" \
     --preview-window="${TMX_PREVIEW_WINDOW:-right,75%,border-left,wrap}" || true

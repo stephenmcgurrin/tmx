@@ -1,0 +1,76 @@
+{
+  "decision": "submitted",
+  "stage": "interview",
+  "result": {
+    "stage": "interview",
+    "title": "Four tmx enhancements: bookmarks, color tags, quick-last, window kill",
+    "goalSlug": "four-enhancements",
+    "answers": [
+      {
+        "questionId": "scope",
+        "selectedOptionIds": [
+          "all"
+        ],
+        "customAnswer": "",
+        "answer": "All four in v1.3.0",
+        "completed": true
+      },
+      {
+        "questionId": "palette",
+        "selectedOptionIds": [
+          "8"
+        ],
+        "customAnswer": "",
+        "note": "this should use the themeing set in their terminal, right?",
+        "answer": "8 colors + none (recommended)",
+        "completed": true
+      },
+      {
+        "questionId": "bookmark-key",
+        "selectedOptionIds": [
+          "ctrl-p"
+        ],
+        "customAnswer": "",
+        "answer": "Ctrl-p (recommended)",
+        "completed": true
+      },
+      {
+        "questionId": "color-key",
+        "selectedOptionIds": [
+          "ctrl-l"
+        ],
+        "customAnswer": "",
+        "answer": "Ctrl-l \u2014 'label' (recommended)",
+        "completed": true
+      },
+      {
+        "questionId": "color-render",
+        "selectedOptionIds": [
+          "dot-before"
+        ],
+        "customAnswer": "",
+        "answer": "Colored dot before status marker (recommended)",
+        "completed": true
+      },
+      {
+        "questionId": "last-flag",
+        "selectedOptionIds": [
+          "--last"
+        ],
+        "customAnswer": "",
+        "answer": "--last only (recommended)",
+        "completed": true
+      },
+      {
+        "questionId": "mru-write-timing",
+        "selectedOptionIds": [
+          "tmx-only"
+        ],
+        "customAnswer": "",
+        "note": "what is the MRU file?",
+        "answer": "Only tmx attaches (recommended)",
+        "completed": true
+      }
+    ]
+  }
+}

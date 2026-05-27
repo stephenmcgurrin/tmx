@@ -1,0 +1,105 @@
+{
+  "stage": "interview",
+  "title": "Four tmx enhancements: bookmarks, color tags, quick-last, window kill",
+  "goalSlug": "four-enhancements",
+  "questions": [
+    {
+      "id": "scope",
+      "prompt": "All four features in scope? Any you want to drop or defer?",
+      "description": "Bookmarked dirs, per-session color tags, tmx --last, window-level kill.",
+      "answerMode": "multi-custom",
+      "recommendedAnswer": "All four. Ship together as v1.3.0.",
+      "recommendedOptionIds": ["all"],
+      "options": [
+        { "id": "all", "label": "All four in v1.3.0" },
+        { "id": "bookmarks-only", "label": "Bookmarks only" },
+        { "id": "colors-only", "label": "Color tags only" },
+        { "id": "last-only", "label": "Quick-last only" },
+        { "id": "win-kill-only", "label": "Window kill only" }
+      ],
+      "required": true
+    },
+    {
+      "id": "palette",
+      "prompt": "How many color tag options?",
+      "description": "The Ctrl-l palette shows named colors. How many should there be?",
+      "answerMode": "single-custom",
+      "recommendedAnswer": "8 colors: red, green, blue, yellow, magenta, cyan, white, gray — plus a '(none)' option to clear. Enough variety without being overwhelming.",
+      "recommendedOptionIds": ["8"],
+      "options": [
+        { "id": "8", "label": "8 colors + none (recommended)" },
+        { "id": "5", "label": "5 colors + none" },
+        { "id": "12", "label": "12 colors + none" }
+      ],
+      "required": true
+    },
+    {
+      "id": "bookmark-key",
+      "prompt": "Keybind for toggling bookmarks in the directory picker?",
+      "description": "Currently unbound keys in the dir picker: Ctrl-p. Ctrl-b is tmux prefix so avoid it.",
+      "answerMode": "single-custom",
+      "recommendedAnswer": "Ctrl-p — intuitive ('pin') and unbound.",
+      "recommendedOptionIds": ["ctrl-p"],
+      "options": [
+        { "id": "ctrl-p", "label": "Ctrl-p (recommended)" },
+        { "id": "ctrl-b", "label": "Ctrl-b (conflicts with tmux prefix)" },
+        { "id": "ctrl-f", "label": "Ctrl-f" }
+      ],
+      "required": true
+    },
+    {
+      "id": "color-key",
+      "prompt": "Keybind for color tagging in the main picker?",
+      "description": "Ctrl-l is currently free. Ctrl-c would conflict with SIGINT.",
+      "answerMode": "single-custom",
+      "recommendedAnswer": "Ctrl-l — 'l' for 'label', currently unbound.",
+      "recommendedOptionIds": ["ctrl-l"],
+      "options": [
+        { "id": "ctrl-l", "label": "Ctrl-l — 'label' (recommended)" },
+        { "id": "ctrl-t", "label": "Ctrl-t — 'tag'" }
+      ],
+      "required": true
+    },
+    {
+      "id": "color-render",
+      "prompt": "How should the color tag appear on session lines?",
+      "description": "Options: a colored dot BEFORE the status marker, a colored bar/dash, or just color the session name text.",
+      "answerMode": "single-custom",
+      "recommendedAnswer": "A colored dot (●) placed BEFORE the status marker (●/◎), so both are visible. e.g. '● ● my-session  1w 0c' for a current session tagged red.",
+      "recommendedOptionIds": ["dot-before"],
+      "options": [
+        { "id": "dot-before", "label": "Colored dot before status marker (recommended)" },
+        { "id": "dot-after", "label": "Colored dot after status marker" },
+        { "id": "color-name", "label": "Color the session name text itself" }
+      ],
+      "required": true
+    },
+    {
+      "id": "last-flag",
+      "prompt": "Flag name for quick-last?",
+      "description": "Options: --last, -l, or both.",
+      "answerMode": "single-custom",
+      "recommendedAnswer": "--last only. Short flags are meh for tmx since there are so few flags and --last is self-documenting. Covers the use case without flag proliferation.",
+      "recommendedOptionIds": ["--last"],
+      "options": [
+        { "id": "--last", "label": "--last only (recommended)" },
+        { "id": "-l", "label": "-l only" },
+        { "id": "both", "label": "Both --last and -l" }
+      ],
+      "required": true
+    },
+    {
+      "id": "mru-write-timing",
+      "prompt": "When should the MRU file be updated?",
+      "description": "Options: on every attach_normal/attach_detach_others call, or only from tmx (not external tmux attaches).",
+      "answerMode": "single-custom",
+      "recommendedAnswer": "Only from tmx attaches — MRU tracking in attach_normal/attach_detach_others. External attaches (outside tmx) won't be tracked, which is fine.",
+      "recommendedOptionIds": ["tmx-only"],
+      "options": [
+        { "id": "tmx-only", "label": "Only tmx attaches (recommended)" },
+        { "id": "all-attaches", "label": "Any tmux attach (harder, needs hook)" }
+      ],
+      "required": true
+    }
+  ]
+}
