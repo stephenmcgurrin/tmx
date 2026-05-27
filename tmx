@@ -20,7 +20,7 @@ esac
 
 # ─── Helper functions ──────────────────────────────────────────
 
-clean_sel() { printf '%s' "$1" | sed 's/\x1b\[[0-9;]*m//g; s/^[[:space:]]*//; s/[[:space:]]*[0-9]*w.*$//; s/^[●*◎] //; s/^ *//'; }
+clean_sel() { printf '%s' "$1" | sed 's/\x1b\[[0-9;]*m//g; s/^[[:space:]]*//; s/[[:space:]]*[0-9]*w.*$//; s/^[●*◎]\+ //; s/^[●*◎] *//; s/^ *//'; }
 
 skip_header() {
   case "$1" in *━━━*|'') return 1 ;; esac
@@ -129,7 +129,9 @@ EOF
       else
         _act="$(( _diff / 86400 ))d"
       fi
-      _tag_dot="$(_color_tag_for_session "$s"; [ -n "$(_color_tag_for_session "$s")" ] && printf '● \033[0m' || true)"
+      _tag_color="$(_color_tag_for_session "$s")"
+      _tag_dot=""
+      [ -n "$_tag_color" ] && _tag_dot="${_tag_color}● \033[0m"
       if [ -n "${TMUX-}" ] && [ "$s" = "$("$TMUX_BIN" display-message -p '#S' 2>/dev/null)" ]; then
         printf '%s%s● %s  \033[0m%s%sw\033[0m %s%sc\033[0m %s%s\033[0m\n' "$_tag_dot" "$TMX_COLOR_CURRENT" "$s" "$TMX_COLOR_WINDOWS" "$_w" "$TMX_COLOR_CLIENTS" "$_c" "$TMX_COLOR_ACTIVITY" "$_act"
       elif [ "$_c" -gt 0 ] 2>/dev/null; then
@@ -191,7 +193,7 @@ preview_session() {
   s="$1"
   case "$s" in
     *━━━*)
-      printf "Hidden sessions — ctrl-a to hide, ctrl-h to hide/unhide, r to rename, ctrl-x to kill\n"
+      printf "Hidden sessions — ctrl-a to hide, ctrl-h to hide/unhide, r to rename, ctrl-x to kill session/window\n"
       ;;
     *)
       s="$(clean_sel "$s")"
@@ -395,7 +397,7 @@ case "${1:-}" in
     printf '%s\n' "  Ctrl-h: hide/unhide   Ctrl-a: toggle hidden   Ctrl-x: kill session/window"
     printf '%s\n' "  Ctrl-e: edit description   Ctrl-l: color tag   Ctrl-p: pin bookmark"
     printf '%s\n' "  Ctrl-w: window view (Esc to return)"
-    printf '%s\n' "  tmx --last: jump to most recent session"
+    printf '%s\n' "  tmx --last         jump to previous session"
     printf '%s\n' ""
     printf '%s\n' "Config: ~/.tmxrc (sourced as shell)"
     printf '%s\n' "  TMX_SCAN_DEPTH=3          find depth for dir picker"
@@ -408,8 +410,6 @@ case "${1:-}" in
     printf '%s\n' "  TMX_COLOR_WINDOWS=\033[38;2;148;226;213m  window count"
     printf '%s\n' "  TMX_COLOR_CLIENTS=\033[38;2;250;179;135m  client count"
     printf '%s\n' "  TMX_COLOR_ACTIVITY=\033[38;2;166;173;200m  activity time"
-    printf '%s\n' ""
-    printf '%s\n' "  tmx --last         jump to previous session"
     exit 0
     ;;
 

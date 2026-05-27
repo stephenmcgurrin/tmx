@@ -31,7 +31,8 @@ Requires `~/bin` in `PATH` (or anywhere you like).
 ## Usage
 
 ```
-tmx
+tmx          # session picker
+tmx --last   # jump to previous session
 ```
 
 ### Keybindings
@@ -47,18 +48,37 @@ tmx
 | `r` | Rename session |
 | `Ctrl-h` | Hide/unhide session |
 | `Ctrl-a` | Toggle hidden sessions (⚠️ conflicts with default tmux prefix) |
-| `Ctrl-x` | Kill session (with confirm) |
+| `Ctrl-x` | Kill session / kill window (context-aware, with confirm) |
 | `Ctrl-e` | Edit session description |
+| `Ctrl-l` | Set color tag (pick from 8-color palette) |
 | `?` | Toggle help in preview |
 | `q` | Quit |
 
 Session lines show `●` (current, green), `◎` (attached by others, amber), or
 unadorned (unattached), plus window count, client count, and last activity.
+Color-tagged sessions show a colored dot before the status marker.
 
 ### Hidden sessions
 
 `Ctrl-h` hides/unhides a session (stored in `~/.tmx-hidden-sessions`).
 `Ctrl-a` toggles the hidden-section visibility in the picker.
+
+### Color tags
+
+`Ctrl-l` opens a palette to assign a color label to a session. The colored dot
+appears before the status marker on the session line. Colors are stored in
+`~/.tmx-session-notes` alongside descriptions. Select `(none)` to remove a tag.
+
+### Bookmarked directories
+
+In the new-session directory picker (`Ctrl-n`), `Ctrl-p` pins/unpins the
+currently selected directory. Bookmarked dirs appear in a `---bookmarks---`
+section at the very top of the list. Stored in `~/.cache/tmx/bookmarks`.
+
+### Quick-last
+
+`tmx --last` jumps directly to your previous session without opening the
+picker. Tracks session order via `~/.cache/tmx/mru`.
 
 ### Config
 
