@@ -20,7 +20,7 @@ esac
 
 # ─── Helper functions ──────────────────────────────────────────
 
-clean_sel() { printf '%s' "$1" | sed 's/\x1b\[[0-9;]*m//g; s/^[[:space:]]*//; s/[[:space:]]*[0-9]*w.*$//; s/^[●*] //; s/^ *//'; }
+clean_sel() { printf '%s' "$1" | sed 's/\x1b\[[0-9;]*m//g; s/^[[:space:]]*//; s/[[:space:]]*[0-9]*w.*$//; s/^[●*] //; s/^[●*] //; s/^ *//'; }
 
 skip_header() {
   case "$1" in *━━━*|'') return 1 ;; esac
