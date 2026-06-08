@@ -77,3 +77,12 @@ prevents accidents.
 `Ctrl-y` in the picker to yank the selected session name into the system
 clipboard. Small quality-of-life thing for scripting or sharing session names
 with teammates.
+
+### Auto-color by session name
+
+On session creation, automatically assign a color tag based on pattern
+matching against the session name. A simple config file
+(`~/.config/tmx/color-rules` or similar) maps globs or regex patterns to
+colors — e.g., `work-* → blue`, `personal-* → green`, `tmp* → yellow`.
+First-match-wins, with a `default` fallback. Keeps the picker visually
+organized without needing to manually `Ctrl-l` tag every new session.

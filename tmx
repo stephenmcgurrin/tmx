@@ -18,6 +18,9 @@ case "$0" in
   *)   SCRIPT="$(command -v "$0")" ;;
 esac
 
+# ─── Config loading (sourced early so dispatch handlers can use it) ──
+[ -f "${HOME}/.tmxrc" ] && . "${HOME}/.tmxrc"
+
 # ─── Helper functions ──────────────────────────────────────────
 
 clean_sel() { printf '%s' "$1" | sed 's/\x1b\[[0-9;]*m//g; s/^[[:space:]]*//; s/[[:space:]]*[0-9]*w.*$//; s/^[●*] //; s/^[●*] //; s/^ *//'; }
@@ -182,11 +185,11 @@ EOF
           _tag_dot="${_tag_color}● $(printf '\033[0m')"
         fi
         if [ -n "${TMUX-}" ] && [ "$s" = "$("$TMUX_BIN" display-message -p '#S' 2>/dev/null)" ]; then
-          printf '        %s%s* %s  \033[0m%s%sw\033[0m %s%sc\033[0m %s%s\033[0m\n' "$_tag_dot" "$TMX_COLOR_CURRENT" "$s" "$TMX_COLOR_WINDOWS" "$_w" "$TMX_COLOR_CLIENTS" "$_c" "$TMX_COLOR_ACTIVITY" "$_act"
+          printf '        %s* %s%s  \033[0m%s%sw\033[0m %s%sc\033[0m %s%s\033[0m\n' "$_tag_dot" "$TMX_COLOR_CURRENT" "$s" "$TMX_COLOR_WINDOWS" "$_w" "$TMX_COLOR_CLIENTS" "$_c" "$TMX_COLOR_ACTIVITY" "$_act"
         elif [ "$_c" -gt 0 ] 2>/dev/null; then
-          printf '        %s%s* %s  \033[0m%s%sw\033[0m %s%sc\033[0m %s%s\033[0m\n' "$_tag_dot" "$TMX_COLOR_ATTACHED" "$s" "$TMX_COLOR_WINDOWS" "$_w" "$TMX_COLOR_CLIENTS" "$_c" "$TMX_COLOR_ACTIVITY" "$_act"
+          printf '        %s* %s%s  \033[0m%s%sw\033[0m %s%sc\033[0m %s%s\033[0m\n' "$_tag_dot" "$TMX_COLOR_ATTACHED" "$s" "$TMX_COLOR_WINDOWS" "$_w" "$TMX_COLOR_CLIENTS" "$_c" "$TMX_COLOR_ACTIVITY" "$_act"
         else
-          printf '        %s%s* %s%sw\033[0m %s%sc\033[0m %s%s\033[0m\n' "$_tag_dot" "$s" "$TMX_COLOR_WINDOWS" "$_w" "$TMX_COLOR_CLIENTS" "$_c" "$TMX_COLOR_ACTIVITY" "$_act"
+          printf '        %s* %s%s  %s%sw\033[0m %s%sc\033[0m %s%s\033[0m\n' "$_tag_dot" "$s" "$TMX_COLOR_WINDOWS" "$_w" "$TMX_COLOR_CLIENTS" "$_c" "$TMX_COLOR_ACTIVITY" "$_act"
         fi
       done
     fi
@@ -404,6 +407,27 @@ create_session() {
 
   "$TMUX_BIN" new-session -ds "$name" -c "$dir"
   attach_normal "$name"
+
+  # Auto-color by session name (if user defined tmx_auto_color in ~/.tmxrc)
+  if command -v tmx_auto_color >/dev/null 2>&1; then
+    _auto_color="$(tmx_auto_color "$name" 2>/dev/null || true)"
+    if [ -n "$_auto_color" ] && [ "$_auto_color" != "(none)" ]; then
+      # Preserve existing description if present, update/add color
+      if [ -f "$NOTES_FILE" ]; then
+        _existing="$(grep -F "$name"$'\t' "$NOTES_FILE" 2>/dev/null | head -1)"
+        if [ -n "$_existing" ]; then
+          _desc="$(printf '%s' "$_existing" | cut -f2)"
+          grep -Fv "$name"$'\t' "$NOTES_FILE" > "${NOTES_FILE}.tmp" 2>/dev/null || true
+          mv "${NOTES_FILE}.tmp" "$NOTES_FILE"
+          printf '%s\t%s\t%s\n' "$name" "$_desc" "$_auto_color" >> "$NOTES_FILE"
+        else
+          printf '%s\t\t%s\n' "$name" "$_auto_color" >> "$NOTES_FILE"
+        fi
+      else
+        printf '%s\t\t%s\n' "$name" "$_auto_color" >> "$NOTES_FILE"
+      fi
+    fi
+  fi
 }
 
 # ─── Internal dispatch (called by fzf reload / execute binds) ──
@@ -440,6 +464,7 @@ case "${1:-}" in
     printf '%s\n' "  TMX_COLOR_WINDOWS=\033[38;2;148;226;213m  window count"
     printf '%s\n' "  TMX_COLOR_CLIENTS=\033[38;2;250;179;135m  client count"
     printf '%s\n' "  TMX_COLOR_ACTIVITY=\033[38;2;166;173;200m  activity time"
+    printf '%s\n' "  tmx_auto_color()          function: echo color for auto-tag on create"
     exit 0
     ;;
 
@@ -747,7 +772,7 @@ set -eu
 # Guard: if we somehow reach main with args, bail silently (fzf reload races, etc.)
 [ $# -eq 0 ] || exit 0
 
-# ─── Config defaults (overridden by ~/.tmxrc if present) ──────
+# ─── Config defaults (~/.tmxrc sourced earlier, overrides these) ──────
 TMX_SCAN_DEPTH="${TMX_SCAN_DEPTH:-3}"
 TMX_EXCLUDE_PATHS="${TMX_EXCLUDE_PATHS:-node_modules|__pycache__|.git|target|dist}"
 TMX_SORT_ORDER="${TMX_SORT_ORDER:-alpha}"
@@ -758,8 +783,6 @@ TMX_COLOR_ATTACHED="${TMX_COLOR_ATTACHED:-${_esc}[38;2;249;226;175m}"
 TMX_COLOR_WINDOWS="${TMX_COLOR_WINDOWS:-${_esc}[38;2;148;226;213m}"
 TMX_COLOR_CLIENTS="${TMX_COLOR_CLIENTS:-${_esc}[38;2;250;179;135m}"
 TMX_COLOR_ACTIVITY="${TMX_COLOR_ACTIVITY:-${_esc}[38;2;166;173;200m}"
-[ -f "${HOME}/.tmxrc" ] && . "${HOME}/.tmxrc"
-
 need() {
   command -v "$1" >/dev/null 2>&1 || {
     printf '%s\n' "$1 not found. Install it and try again.\n" >&2
