@@ -86,3 +86,12 @@ matching against the session name. A simple config file
 colors — e.g., `work-* → blue`, `personal-* → green`, `tmp* → yellow`.
 First-match-wins, with a `default` fallback. Keeps the picker visually
 organized without needing to manually `Ctrl-l` tag every new session.
+
+### Sort / group by color tag
+
+A sort mode (`TMX_SORT_ORDER=color`) that groups sessions by their color
+tag before applying the usual alpha/recent sort within each group.
+Uncolored sessions fall to the bottom. Makes it easy to visually cluster
+all "red" (internal) sessions together, "green" (NBD) sessions together,
+etc. Could also work as a secondary sort key: always group by color first,
+then sort by recency within the group.
