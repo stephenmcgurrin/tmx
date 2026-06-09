@@ -103,7 +103,14 @@ picker. Tracks session order via `~/.cache/tmx/mru`.
 
 ### Config
 
-Optional `~/.tmxrc` (shell-sourced):
+Copy `tmxrc.sample` to `~/.tmxrc` as a starting point, then edit to taste.
+The file is shell-sourced by tmx on startup.
+
+```bash
+cp tmxrc.sample ~/.tmxrc
+```
+
+All available settings (most are commented out — uncomment what you need):
 
 ```sh
 TMX_SCAN_DEPTH=3               # find depth for dir picker

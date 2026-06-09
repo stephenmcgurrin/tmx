@@ -1,0 +1,50 @@
+# tmx config — copy to ~/.tmxrc, then edit to taste
+# https://github.com/stephenmcgurrin/tmx
+
+# ─── Session list order ────────────────────────────────────────
+# "recent" sorts by last activity (newest first), "alpha" sorts A–Z.
+TMX_SORT_ORDER=recent
+
+# ─── Directory picker ──────────────────────────────────────────
+# How deep `find` recurses when scanning for directories.
+# TMX_SCAN_DEPTH=3
+#
+# Pipe-separated directory names to skip.
+# TMX_EXCLUDE_PATHS="node_modules|__pycache__|.git|target|dist"
+#
+# Max entries to keep in the recent-directories cache.
+# TMX_RECENT_DIRS_MAX=50
+
+# ─── Preview window ────────────────────────────────────────────
+# fzf preview layout (passed to --preview-window).
+# TMX_PREVIEW_WINDOW="right,75%,border-left,wrap"
+
+# ─── Nerd Font glyphs ──────────────────────────────────────────
+# Set to 1 if you use a Nerd Font patched terminal.
+# TMX_NERD_FONTS=0
+
+# ─── Colors (Catppuccin-flavored truecolor) ────────────────────
+# Uncomment and tweak any of these to override the defaults.
+# TMX_COLOR_CURRENT="\033[38;2;166;227;161m"   # current session
+# TMX_COLOR_ATTACHED="\033[38;2;249;226;175m"  # attached-by-others
+# TMX_COLOR_WINDOWS="\033[38;2;148;226;213m"   # window count
+# TMX_COLOR_CLIENTS="\033[38;2;250;179;135m"   # client count
+# TMX_COLOR_ACTIVITY="\033[38;2;166;173;200m"  # last-activity label
+
+# ─── Auto-color new sessions by name ───────────────────────────
+# Define this function to auto-assign a color tag when you create
+# a session. The function receives the session name as $1 and
+# should echo one of: red green blue yellow magenta cyan white gray
+# (or nothing to skip tagging).
+# The patterns below use shell case/glob — * matches anything.
+tmx_auto_color() {
+  case "$1" in
+    *PERS*)       echo "magenta" ;;
+    *INTERNAL*|*INT*) echo "red" ;;
+    *DOTS*)       echo "blue" ;;
+    *NBD*)        echo "green" ;;
+    # Uncomment and add your own patterns:
+    # *work*)       echo "cyan" ;;
+    # *tmp*)        echo "yellow" ;;
+  esac
+}
