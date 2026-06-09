@@ -69,6 +69,27 @@ and last activity. Color-tagged sessions show a colored dot before the name.
 appears before the session name. Colors are stored in
 `~/.tmx-session-notes` alongside descriptions. Select `(none)` to remove a tag.
 
+#### Auto-color by session name
+
+Define a `tmx_auto_color()` function in `~/.tmxrc` to automatically assign
+colors when a new session is created. The function receives the session name
+as `$1` and should `echo` a color name (or nothing for no tag):
+
+```sh
+tmx_auto_color() {
+  case "$1" in
+    *PERS*)     echo "magenta" ;;
+    *INTERNAL*) echo "red" ;;
+    *DOTS*)     echo "blue" ;;
+    *NBD*)      echo "green" ;;
+  esac
+}
+```
+
+Available colors: `red`, `green`, `blue`, `yellow`, `magenta`, `cyan`,
+`white`, `gray`. The manual `Ctrl-l` palette always takes precedence on
+individual sessions.
+
 ### Bookmarked directories
 
 In the new-session directory picker (`Ctrl-n`), `Ctrl-f` pins/unpins the
