@@ -863,7 +863,8 @@ case "$CHOICE" in
     ;;
   [0-9]*:*)
     _win="$(printf '%s' "$CHOICE" | sed 's/[: ].*//')"
-    _parent="$("$TMUX_BIN" list-windows -F '#{session_name}|#{window_index}' 2>/dev/null | grep "|$_win$" | cut -d'|' -f1 | head -1)"
+    # Use the stored parent session from window view (exact match, not cross-session grep)
+    _parent="$(cat "${TMX_STATE_FILE}.winsession" 2>/dev/null || true)"
     [ -n "$_parent" ] && attach_normal "$_parent:$_win"
     exit 0
     ;;
