@@ -18,7 +18,7 @@ support, but can copy.
 
 ## Requirements
 
-- tmux 2.6+, fzf 0.21+, POSIX `sh`
+- tmux 2.6+, fzf 0.21+, bash 4+
 
 ## Install
 
@@ -104,7 +104,7 @@ picker. Tracks session order via `~/.cache/tmx/mru`.
 ### Config
 
 Copy `tmxrc.sample` to `~/.tmxrc` as a starting point, then edit to taste.
-The file is shell-sourced by tmx on startup.
+The file is executed as shell code on every run; keep it writable only by you.
 
 ```bash
 cp tmxrc.sample ~/.tmxrc

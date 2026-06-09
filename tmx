@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # tmx: pick or create a tmux session via fzf, then attach/switch.
 # author: Stephen McGurrin, 2026
 # deps: tmux, fzf
@@ -28,6 +28,18 @@ clean_sel() { printf '%s' "$1" | sed 's/\x1b\[[0-9;]*m//g; s/^[[:space:]]*//; s/
 skip_header() {
   case "$1" in *━━━*|'') return 1 ;; esac
   return 0
+}
+
+# Protect data files: only mv a temp file into place on a successful write.
+# grep exit 0/1 (= lines matched or none matched → tmp legitimately empty)
+# are allowed; exit >1 (= disk error) keeps the original intact.
+safe_tmp_mv() {
+  _src="$1" _dst="$2" _grep_exit="${3:-0}"
+  if [ "$_grep_exit" -le 1 ] 2>/dev/null; then
+    mv "$_src" "$_dst" 2>/dev/null || rm -f "$_src"
+  else
+    rm -f "$_src"
+  fi
 }
 
 # Print every hidden session (one per line); empty if no hidden file.
@@ -85,7 +97,7 @@ _color_escape() {
 
 _color_tag_for_session() {
   if [ -f "$NOTES_FILE" ]; then
-    _tag="$(grep -F "$1"$'\t' "$NOTES_FILE" 2>/dev/null | head -1 | cut -f3-)"
+    _tag="$(awk -F'\t' -v s="$1" '$1==s{print $3; exit}' "$NOTES_FILE" 2>/dev/null)"
     [ -n "$_tag" ] && _color_escape "$_tag"
   fi
 }
@@ -243,7 +255,7 @@ preview_session() {
       [ -n "$_running" ] && printf '\033[38;2;148;226;213m▸ %s\033[0m\n' "$_running"
       # Session description
       if [ -f "$NOTES_FILE" ]; then
-        _desc="$(grep -F "$s"$'\t' "$NOTES_FILE" 2>/dev/null | cut -f2-)"
+        _desc="$(awk -F'\t' -v s="$s" '$1==s{print $2; exit}' "$NOTES_FILE" 2>/dev/null)"
         [ -n "$_desc" ] && printf '\033[38;2;250;179;135m%s\033[0m\n' "$_desc"
       fi
 
@@ -290,15 +302,13 @@ attach_detach_others() {
 
 scan_dirs() {
   _exclude="${TMX_EXCLUDE_PATHS:-node_modules|__pycache__|.git|target|dist}"
-  _args="-maxdepth ${TMX_SCAN_DEPTH:-3} -type d -not -path '*/\..*'"
-  # Build -not -path args for each exclude pattern
-  _oldIFS="$IFS"
-  IFS='|'
-  for _pat in $_exclude; do
-    [ -n "$_pat" ] && _args="$_args -not -path '*/$_pat/*'"
-  done
-  IFS="$_oldIFS"
-  eval "find '$1' $_args 2>/dev/null" | sort
+  _depth="${TMX_SCAN_DEPTH:-3}"
+  # Numeric guard on depth (malformed rc value can't inject find predicates)
+  case "$_depth" in ''|*[!0-9]*) _depth=3 ;; esac
+  # Post-filter with grep instead of eval+find -not -path (no command injection)
+  find "$1" -maxdepth "$_depth" -type d -not -path '*/.*' 2>/dev/null \
+    | grep -Ev "/(${_exclude})(/|\$)" \
+    | sort
 }
 
 pick_directory() {
@@ -416,15 +426,12 @@ create_session() {
     if [ -n "$_auto_color" ] && [ "$_auto_color" != "(none)" ]; then
       # Preserve existing description if present, update/add color
       if [ -f "$NOTES_FILE" ]; then
-        _existing="$(grep -F "$name"$'\t' "$NOTES_FILE" 2>/dev/null | head -1)"
-        if [ -n "$_existing" ]; then
-          _desc="$(printf '%s' "$_existing" | cut -f2)"
-          grep -Fv "$name"$'\t' "$NOTES_FILE" > "${NOTES_FILE}.tmp" 2>/dev/null || true
-          mv "${NOTES_FILE}.tmp" "$NOTES_FILE"
-          printf '%s\t%s\t%s\n' "$name" "$_desc" "$_auto_color" >> "$NOTES_FILE"
-        else
-          printf '%s\t\t%s\n' "$name" "$_auto_color" >> "$NOTES_FILE"
-        fi
+        _desc="$(awk -F'\t' -v s="$name" '$1==s{print $2; exit}' "$NOTES_FILE" 2>/dev/null)"
+        # Remove any existing line for this session
+        awk -F'\t' -v s="$name" '$1!=s' "$NOTES_FILE" > "${NOTES_FILE}.tmp" 2>/dev/null \
+          && mv "${NOTES_FILE}.tmp" "$NOTES_FILE" \
+          || rm -f "${NOTES_FILE}.tmp"
+        printf '%s\t%s\t%s\n' "$name" "$_desc" "$_auto_color" >> "$NOTES_FILE"
       else
         printf '%s\t\t%s\n' "$name" "$_auto_color" >> "$NOTES_FILE"
       fi
@@ -521,10 +528,12 @@ case "${1:-}" in
       printf '%s\n' "$newname" >> "${HIDDEN_FILE}.tmp"
       mv "${HIDDEN_FILE}.tmp" "$HIDDEN_FILE"
     fi
-    # Update MRU: replace old name with new name
+    # Update MRU: replace old name with new name (exact match, no regex hazards)
     if [ -f "$MRU_FILE" ]; then
-      sed -i '' "s/^${session}$/${newname}/" "$MRU_FILE" 2>/dev/null || \
-        sed -i "s/^${session}$/${newname}/" "$MRU_FILE" 2>/dev/null || true
+      awk -v old="$session" -v new="$newname" \
+        '$0==old{print new; next} {print}' "$MRU_FILE" > "${MRU_FILE}.tmp" 2>/dev/null \
+        && mv "${MRU_FILE}.tmp" "$MRU_FILE" \
+        || rm -f "${MRU_FILE}.tmp"
     fi
     exit 0
     ;;
@@ -649,8 +658,9 @@ case "${1:-}" in
     desc="$(printf '%s' "$desc" | awk '{$1=$1;print}')"
 
     if [ -f "$NOTES_FILE" ]; then
-      grep -Fv "$session"$'\t' "$NOTES_FILE" > "${NOTES_FILE}.tmp" 2>/dev/null || true
-      mv "${NOTES_FILE}.tmp" "$NOTES_FILE"
+      awk -F'\t' -v s="$session" '$1!=s' "$NOTES_FILE" > "${NOTES_FILE}.tmp" 2>/dev/null \
+        && mv "${NOTES_FILE}.tmp" "$NOTES_FILE" \
+        || rm -f "${NOTES_FILE}.tmp"
     fi
     [ -n "$desc" ] && printf '%s\t%s\n' "$session" "$desc" >> "$NOTES_FILE"
     exit 0
@@ -678,20 +688,15 @@ case "${1:-}" in
     _color="$(printf '%s' "$_choice" | sed 's/\x1b\[[0-9;]*m//g')"
     # Read existing notes, update or add color field
     if [ -f "$NOTES_FILE" ]; then
-      _existing="$(grep -F "$session"$'\t' "$NOTES_FILE" 2>/dev/null | head -1)"
-      if [ -n "$_existing" ]; then
-        _desc="$(printf '%s' "$_existing" | cut -f2)"
-        grep -Fv "$session"$'\t' "$NOTES_FILE" > "${NOTES_FILE}.tmp" 2>/dev/null || true
-        mv "${NOTES_FILE}.tmp" "$NOTES_FILE"
-        if [ "$_color" = "(none)" ]; then
-          [ -n "$_desc" ] && printf '%s\t%s\n' "$session" "$_desc" >> "$NOTES_FILE"
-        else
-          printf '%s\t%s\t%s\n' "$session" "$_desc" "$_color" >> "$NOTES_FILE"
-        fi
+      _desc="$(awk -F'\t' -v s="$session" '$1==s{print $2; exit}' "$NOTES_FILE" 2>/dev/null)"
+      # Remove any existing line for this session
+      awk -F'\t' -v s="$session" '$1!=s' "$NOTES_FILE" > "${NOTES_FILE}.tmp" 2>/dev/null \
+        && mv "${NOTES_FILE}.tmp" "$NOTES_FILE" \
+        || rm -f "${NOTES_FILE}.tmp"
+      if [ "$_color" = "(none)" ]; then
+        [ -n "$_desc" ] && printf '%s\t%s\n' "$session" "$_desc" >> "$NOTES_FILE"
       else
-        if [ "$_color" != "(none)" ]; then
-          printf '%s\t\t%s\n' "$session" "$_color" >> "$NOTES_FILE"
-        fi
+        printf '%s\t%s\t%s\n' "$session" "$_desc" "$_color" >> "$NOTES_FILE"
       fi
     else
       if [ "$_color" != "(none)" ]; then
