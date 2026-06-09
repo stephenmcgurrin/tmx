@@ -386,6 +386,10 @@ $home_dirs"
 
 create_session() {
   printf 'New session name: ' >/dev/tty
+  # Discard any pending input (e.g. Ctrl-n character queued from fzf)
+  stty -echo 2>/dev/null || true
+  while read -r -t 0 _drain </dev/tty 2>/dev/null; do :; done
+  stty echo 2>/dev/null || true
   IFS= read -r name </dev/tty || name=
   name="$(printf '%s' "$name" | awk '{$1=$1;print}')"
   [ -z "$name" ] && { printf 'Aborted: empty name.\n' >/dev/tty; exit 1; }
