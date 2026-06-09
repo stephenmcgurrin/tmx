@@ -59,8 +59,8 @@ toggle_hidden() {
   session="$1"
   if is_hidden "$session"; then
     if [ -f "$HIDDEN_FILE" ]; then
-      grep -Fxv "$session" "$HIDDEN_FILE" > "${HIDDEN_FILE}.tmp" 2>/dev/null || true
-      mv "${HIDDEN_FILE}.tmp" "$HIDDEN_FILE"
+      { grep -Fxv "$session" "$HIDDEN_FILE" > "${HIDDEN_FILE}.tmp"; _grep_rc=$?; } 2>/dev/null
+      safe_tmp_mv "${HIDDEN_FILE}.tmp" "$HIDDEN_FILE" "$_grep_rc"
     fi
   else
     printf '%s\n' "$session" >> "$HIDDEN_FILE"
@@ -524,9 +524,9 @@ case "${1:-}" in
     "$TMUX_BIN" rename-session -t "$session" "$newname"
 
     if grep -Fxq "$session" "$HIDDEN_FILE" 2>/dev/null; then
-      grep -Fxv "$session" "$HIDDEN_FILE" > "${HIDDEN_FILE}.tmp" 2>/dev/null || true
+      { grep -Fxv "$session" "$HIDDEN_FILE" > "${HIDDEN_FILE}.tmp"; _grep_rc=$?; } 2>/dev/null
       printf '%s\n' "$newname" >> "${HIDDEN_FILE}.tmp"
-      mv "${HIDDEN_FILE}.tmp" "$HIDDEN_FILE"
+      safe_tmp_mv "${HIDDEN_FILE}.tmp" "$HIDDEN_FILE" "$_grep_rc"
     fi
     # Update MRU: replace old name with new name (exact match, no regex hazards)
     if [ -f "$MRU_FILE" ]; then
@@ -558,8 +558,8 @@ case "${1:-}" in
     "$TMUX_BIN" kill-session -t "$session"
 
     if grep -Fxq "$session" "$HIDDEN_FILE" 2>/dev/null; then
-      grep -Fxv "$session" "$HIDDEN_FILE" > "${HIDDEN_FILE}.tmp" 2>/dev/null || true
-      mv "${HIDDEN_FILE}.tmp" "$HIDDEN_FILE"
+      { grep -Fxv "$session" "$HIDDEN_FILE" > "${HIDDEN_FILE}.tmp"; _grep_rc=$?; } 2>/dev/null
+      safe_tmp_mv "${HIDDEN_FILE}.tmp" "$HIDDEN_FILE" "$_grep_rc"
     fi
     exit 0
     ;;
