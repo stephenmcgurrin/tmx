@@ -51,6 +51,7 @@ tmx --last   # jump to previous session
 | `Ctrl-x` | Kill session / kill window (context-aware, with confirm) |
 | `Ctrl-e` | Edit session description |
 | `Ctrl-l` | Set color tag (pick from 8-color palette) |
+| `Ctrl-p` | Jump to previous session (instant toggle) |
 | `?` | Toggle help in preview |
 | `q` | Quit |
 
