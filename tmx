@@ -482,6 +482,16 @@ case "${1:-}" in
     if [ -f "$MRU_FILE" ]; then
       _prev="$(sed -n '2p' "$MRU_FILE" 2>/dev/null || true)"
       if [ -n "$_prev" ]; then
+        # Guard: don't switch to the session we're already in.
+        if [ "$IN_TMUX" -eq 1 ]; then
+          _cur="$("$TMUX_BIN" display-message -p '#S' 2>/dev/null || true)"
+        else
+          _cur=""
+        fi
+        if [ -n "$_cur" ] && [ "$_cur" = "$_prev" ]; then
+          printf 'Already on previous session (%s).\n' "$_prev" >&2
+          exit 0
+        fi
         attach_normal "$_prev"
         exit 0
       fi
@@ -829,7 +839,7 @@ SEL="$(
     --bind "ctrl-e:execute($SCRIPT --internal-set-description {})+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
     --bind "ctrl-l:execute($SCRIPT --internal-set-color {})+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
     --bind "ctrl-w:reload($SCRIPT --internal-list-windows {})+change-preview($SCRIPT --internal-preview-window {})" \
-    --bind "ctrl-p:execute($SCRIPT --last)+accept" \
+    --bind "ctrl-p:become($SCRIPT --last)" \
     --preview "$SCRIPT --internal-preview {}" \
     --preview-window="${TMX_PREVIEW_WINDOW:-right,75%,border-left,wrap}" || true
 )"
