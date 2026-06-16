@@ -460,6 +460,7 @@ case "${1:-}" in
     printf '%s\n' "  Ctrl-h: hide/unhide   Ctrl-a: toggle hidden   Ctrl-x: kill session/window"
     printf '%s\n' "  Ctrl-e: edit description   Ctrl-l: color tag   Ctrl-f: pin bookmark"
     printf '%s\n' "  Ctrl-w: window view (Esc to return)"
+    printf '%s\n' "  Ctrl-p: jump to previous session"
     printf '%s\n' "  tmx --last         jump to previous session"
     printf '%s\n' ""
     printf '%s\n' "Config: ~/.tmxrc (sourced as shell)"
@@ -645,6 +646,7 @@ case "${1:-}" in
     printf '\033[38;2;166;227;161mCtrl-e\033[0m         Edit description\n'
     printf '\033[38;2;166;227;161mCtrl-l\033[0m         Set color tag\n'
     printf '\033[38;2;166;227;161mCtrl-f\033[0m         Pin/unpin bookmark\n'
+    printf '\033[38;2;166;227;161mCtrl-p\033[0m         Jump to previous session\n'
     exit 0
     ;;
 
@@ -827,6 +829,7 @@ SEL="$(
     --bind "ctrl-e:execute($SCRIPT --internal-set-description {})+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
     --bind "ctrl-l:execute($SCRIPT --internal-set-color {})+reload($SCRIPT --internal-render \"$SHOW_HIDDEN_FILE\")" \
     --bind "ctrl-w:reload($SCRIPT --internal-list-windows {})+change-preview($SCRIPT --internal-preview-window {})" \
+    --bind "ctrl-p:execute($SCRIPT --last)+accept" \
     --preview "$SCRIPT --internal-preview {}" \
     --preview-window="${TMX_PREVIEW_WINDOW:-right,75%,border-left,wrap}" || true
 )"
