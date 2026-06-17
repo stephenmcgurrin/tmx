@@ -381,10 +381,11 @@ $home_dirs"
   dir="$(printf '%s\n' "$_input" | \
   fzf --height=90% --layout=reverse --border \
       --prompt='dir> ' --info=inline \
-      --header="Enter: select | Esc: use current dir ($(pwd))${ext_header} | Ctrl-f: pin dir" \
+      --header="Enter: select | Esc: use current dir ($(pwd))${ext_header} | Ctrl-f: pin | Tab: seed search" \
       --preview "$SCRIPT --internal-preview-dir {}" \
       --preview-window=right,50%,border-left \
-      --bind "ctrl-f:execute-silent($SCRIPT --internal-toggle-bookmark {})" || true)"
+      --bind "ctrl-f:execute-silent($SCRIPT --internal-toggle-bookmark {})" \
+      --bind "tab:transform-query(printf '%s' {})" || true)"
   # Reject sentinel lines — treat as Esc (use current dir)
   case "$dir" in ---external---|'') dir="" ;; esac
   case "$dir" in ---recent---) dir="" ;; esac
