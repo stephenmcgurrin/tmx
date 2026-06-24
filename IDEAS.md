@@ -20,9 +20,9 @@ Switching to fuzzy matching (or making it configurable) would let you type
 `prj/tmx` and land on `~/Projects/tmx-dev` without typing the full path
 prefix.
 
-### Session search by window title
+### Session search by window title ✅ (v1.3.0)
 
-`Ctrl-f` or `/` could search across session+window names simultaneously — not
+`Ctrl-f` searches across session+window names simultaneously — not
 just session names. Type `vim` and see every session with a window running
 vim, with the matching window name highlighted in the preview.
 
@@ -47,12 +47,11 @@ In the preview for a session, show the current pane's dimensions
 distinguish identically-named sessions at a glance when you have multiple
 terminal sizes or layouts going.
 
-### Sort by most-recently-used across sessions
+### Sort by most-recently-used across sessions ✅ (v1.3.0)
 
-A global MRU list that tracks which sessions you've switched to (not just
-which are active) and surfaces them at the top regardless of actual tmux
-activity timestamps. Could be a simple `~/.cache/tmx/mru` file appended on
-every attach.
+`TMX_SORT_ORDER=recent` surfaces sessions by MRU (most-recently-switched)
+at the top instead of tmux activity timestamps. Backed by
+`~/.cache/tmx/mru`, updated on every attach.
 
 ### Per-session color tagging ✅ (v1.3.0)
 
@@ -78,14 +77,13 @@ prevents accidents.
 clipboard. Small quality-of-life thing for scripting or sharing session names
 with teammates.
 
-### Auto-color by session name
+### Auto-color by session name ✅ (v1.3.0)
 
 On session creation, automatically assign a color tag based on pattern
-matching against the session name. A simple config file
-(`~/.config/tmx/color-rules` or similar) maps globs or regex patterns to
-colors — e.g., `work-* → blue`, `personal-* → green`, `tmp* → yellow`.
-First-match-wins, with a `default` fallback. Keeps the picker visually
-organized without needing to manually `Ctrl-l` tag every new session.
+matching against the session name. Defined via `tmx_auto_color()` shell
+function in `~/.tmxrc` using a `case` statement — e.g., `work-* → blue`,
+`personal-* → green`, `tmp* → yellow`. First-match-wins. Keeps the picker
+visually organized without needing to manually `Ctrl-l` tag every new session.
 
 ### Sort / group by color tag
 
